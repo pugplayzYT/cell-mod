@@ -35,6 +35,10 @@ final class ServiceSiteStructure extends Structure {
         return ResourceKey.create(Registries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, path));
     }
 
+    Optional<EmergencyService> emergency() {
+        return emergency;
+    }
+
     @Override
     protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
         if (isReserved(context, "public_cell_towers") || (emergency.isPresent() && isReserved(context, "service_sites"))) {

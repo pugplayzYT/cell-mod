@@ -40,6 +40,7 @@ import net.neoforged.neoforge.event.entity.EntityMobGriefingEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -49,8 +50,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 final class EmergencyDispatch {
     private static final int STATION_RANGE = 2048;
@@ -62,8 +65,10 @@ final class EmergencyDispatch {
     private static final String RESPONSE_TAG = "intertnet_emergency_response";
     private static final String RESPONSE_ID = "IntertnetResponse";
     private static final Map<Call, Response> responses = new HashMap<>();
+    private static final Queue<GarageRepair> pendingRepairs = new ConcurrentLinkedQueue<>();
 
     private record Call(UUID owner, EmergencyService service) {}
+    private record GarageRepair(ServerLevel level, BlockPos origin, EmergencyService service) {}
     private enum Phase { LOADING, LEAVING_STATION, EN_ROUTE, ON_SCENE, LEAVING }
     private record Unit(Raider responder, Minecart cart) {}
 
@@ -73,6 +78,7 @@ final class EmergencyDispatch {
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::protectBystanders);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::protectBlocks);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onEntityLoad);
+        NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onInteract);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onStop);
     }
@@ -116,6 +122,7 @@ final class EmergencyDispatch {
     }
 
     private static void tick(ServerTickEvent.Post event) {
+        repairLoadedGarages();
         var iterator = responses.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
@@ -124,6 +131,34 @@ final class EmergencyDispatch {
             if (owner == null || !owner.isAlive() || owner.serverLevel() != response.level || !response.tick(owner)) {
                 response.close();
                 iterator.remove();
+            }
+        }
+    }
+
+    private static void onChunkLoad(ChunkEvent.Load event) {
+        if (event.isNewChunk() || !(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+        for (var start : event.getChunk().getAllStarts().values()) {
+            if (start.isValid() && start.getStructure() instanceof ServiceSiteStructure site) {
+                site.emergency().ifPresent(service -> {
+                    ChunkPos chunk = start.getChunkPos();
+                    BlockPos origin = new BlockPos(chunk.getMinBlockX(), start.getBoundingBox().minY(), chunk.getMinBlockZ());
+                    pendingRepairs.add(new GarageRepair(level, origin, service));
+                });
+            }
+        }
+    }
+
+    private static void repairLoadedGarages() {
+        GarageRepair repair;
+        while ((repair = pendingRepairs.poll()) != null) {
+            ChunkPos chunk = new ChunkPos(repair.origin);
+            ServerLevel level = repair.level;
+            if (level.getChunkSource().getChunkNow(chunk.x, chunk.z) != null
+                    && responses.values().stream().noneMatch(response -> response.level == level
+                    && response.stationChunk.equals(chunk) && response.phase == Phase.LEAVING_STATION)) {
+                ServiceSitePiece.repairEmergencyGarage(level, repair.origin, repair.service);
             }
         }
     }
@@ -208,6 +243,7 @@ final class EmergencyDispatch {
     private static void onStop(ServerStoppingEvent event) {
         responses.values().forEach(Response::close);
         responses.clear();
+        pendingRepairs.clear();
     }
 
     private static void notify(ServerPlayer player, String message) {
@@ -262,7 +298,7 @@ final class EmergencyDispatch {
                 return false;
             }
             if (phase == Phase.LEAVING_STATION) {
-                Vec3 exit = Vec3.atBottomCenterOf(origin.offset(7, 1, 20)).add(0.5, 0, 0);
+                Vec3 exit = Vec3.atBottomCenterOf(origin.offset(7, 1, 22)).add(0.5, 0, 0);
                 if (ServiceTrip.horizontalDistance(lead, exit) > 0.2) {
                     advance(exit, true);
                 } else {
@@ -512,9 +548,7 @@ final class EmergencyDispatch {
 
         private void doors(boolean open) {
             if (origin != null && level.isLoaded(origin)) {
-                for (int x : new int[]{7, 8}) {
-                    ServiceSitePiece.setIronDoor(level, origin.offset(x, 1, 12), open);
-                }
+                ServiceSitePiece.setEmergencyGarage(level, origin, service, open);
             }
         }
 

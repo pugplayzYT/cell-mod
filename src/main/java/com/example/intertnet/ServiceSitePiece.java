@@ -86,8 +86,7 @@ final class ServiceSitePiece extends StructurePiece {
             return;
         }
         Block floor = restaurant ? Blocks.SPRUCE_PLANKS : Blocks.POLISHED_ANDESITE;
-        Block wall = restaurant ? Blocks.STRIPPED_OAK_WOOD
-                : emergency == EmergencyService.MEDIC ? Blocks.SMOOTH_QUARTZ : Blocks.STONE_BRICKS;
+        Block wall = restaurant ? Blocks.STRIPPED_OAK_WOOD : stationWall(emergency);
         Block roof = restaurant ? Blocks.DARK_OAK_PLANKS
                 : emergency == EmergencyService.MEDIC ? Blocks.WHITE_CONCRETE : Blocks.DEEPSLATE_TILES;
         int west = restaurant ? 1 : 2;
@@ -239,7 +238,6 @@ final class ServiceSitePiece extends StructurePiece {
         fill(level, box, 7, 0, 3, 8, 0, 14, Blocks.LIGHT_GRAY_CONCRETE);
         placeIronDoor(level, box, 7, 12, DoorHingeSide.LEFT);
         placeIronDoor(level, box, 8, 12, DoorHingeSide.RIGHT);
-        generateAirBox(level, box, 7, 3, 12, 8, 3, 12);
         placeWallSign(level, box, 9, 3, 13, medic ? "MEDIC STATION" : "POLICE STATION", "Free dispatch", "Call by phone");
         for (int x : new int[]{4, 10}) {
             hangLantern(level, box, x, 4);
@@ -262,6 +260,43 @@ final class ServiceSitePiece extends StructurePiece {
             for (int x : new int[]{4, 10}) {
                 fill(level, box, x, 1, 3, x, 2, 6, Blocks.IRON_BARS);
                 put(level, box, x, 1, 9, Blocks.SMITHING_TABLE);
+            }
+        }
+    }
+
+    private static Block stationWall(@Nullable EmergencyService service) {
+        return service == EmergencyService.MEDIC ? Blocks.SMOOTH_QUARTZ : Blocks.STONE_BRICKS;
+    }
+
+    static void repairEmergencyGarage(ServerLevel level, BlockPos origin, EmergencyService service) {
+        boolean gap = false;
+        Block stripe = service == EmergencyService.MEDIC ? Blocks.RED_CONCRETE : Blocks.BLUE_CONCRETE;
+        for (int x : new int[]{7, 8}) {
+            BlockPos door = origin.offset(x, 1, 12);
+            if (!level.getBlockState(door).is(Blocks.IRON_DOOR)
+                    || !level.getBlockState(door.above()).is(Blocks.IRON_DOOR)
+                    || !level.getBlockState(door.above(3)).is(stripe)) {
+                return;
+            }
+            gap |= level.getBlockState(door.above(2)).isAir();
+        }
+        if (gap) {
+            setEmergencyGarage(level, origin, service, false);
+        }
+    }
+
+    static void setEmergencyGarage(ServerLevel level, BlockPos origin, EmergencyService service, boolean open) {
+        Block wall = stationWall(service);
+        for (int x : new int[]{7, 8}) {
+            BlockPos door = origin.offset(x, 1, 12);
+            BlockPos header = door.above(2);
+            BlockState state = level.getBlockState(header);
+            if (open && state.is(wall)) {
+                level.setBlock(header, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            }
+            setIronDoor(level, door, open);
+            if (!open && state.isAir() && level.getBlockState(door.above()).is(Blocks.IRON_DOOR)) {
+                level.setBlock(header, wall.defaultBlockState(), Block.UPDATE_ALL);
             }
         }
     }
