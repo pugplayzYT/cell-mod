@@ -30,15 +30,13 @@ public class PhoneScreen extends Screen {
 
     private static final int PHONE_W = 218;
     private static final int PHONE_H = 190;
-    private static final String[] APPS = {"Messages", "Help Call", "Delivery", "Rideshare"};
+    private static final String[] APPS = {"Messages", "SOS", "Delivery", "Rideshare"};
     private static final int TAB_GAP = 2;
     private static final int TAB_W = (PHONE_W - 10 - TAB_GAP * (APPS.length - 1)) / APPS.length;
 
     private int phoneX;
     private int phoneY;
 
-    // 0 = Messages App, 1 = Help Call (Village Minecart Rescue) App
-    private int currentApp = 0;
     private EditBox messageInputBox;
     private int scrollOffset = 0;
 
@@ -71,15 +69,7 @@ public class PhoneScreen extends Screen {
         this.messageInputBox.setHint(Component.literal("Message network..."));
         this.addRenderableWidget(this.messageInputBox);
 
-        updateInputVisibility();
-    }
-
-    private void updateInputVisibility() {
-        boolean isMsgs = (this.currentApp == 0);
-        if (this.messageInputBox != null) {
-            this.messageInputBox.visible = isMsgs;
-            this.messageInputBox.setFocused(isMsgs);
-        }
+        this.messageInputBox.setFocused(true);
     }
 
     @Override
@@ -210,18 +200,14 @@ public class PhoneScreen extends Screen {
         int tabY = y + 47;
         for (int i = 0; i < APPS.length; i++) {
             int tabX = x + 5 + i * (TAB_W + TAB_GAP);
-            boolean active = this.currentApp == i;
+            boolean active = i == 0;
             g.fill(tabX, tabY, tabX + TAB_W, tabY + 14, active ? 0xFF0284C7 : 0xFF1E293B);
             g.renderOutline(tabX, tabY, TAB_W, 14, active ? 0xFF38BDF8 : 0xFF475569);
             g.drawCenteredString(this.font, fit(this.font, APPS[i], TAB_W - 4), tabX + TAB_W / 2, tabY + 3, 0xFFFFFFFF);
         }
 
         // 5. App Body Area
-        if (this.currentApp == 0) {
-            renderMessagesApp(g, bars, mouseX, mouseY);
-        } else {
-            renderHelpCallApp(g, bars, sig.connectedViaSatellite(), mouseX, mouseY);
-        }
+        renderMessagesApp(g, bars, mouseX, mouseY);
 
         // 6. Bottom Status Bar (y+170 to y+185)
         int footX = x + 6;
@@ -292,58 +278,6 @@ public class PhoneScreen extends Screen {
         g.drawCenteredString(this.font, "Send", sendX + 16, sendY + 3, 0xFFFFFFFF);
     }
 
-    private void renderHelpCallApp(GuiGraphics g, int bars, boolean isSatellite, int mouseX, int mouseY) {
-        int boxX = this.phoneX + 8;
-        int boxY = this.phoneY + 64;
-        int boxW = PHONE_W - 16;
-        int boxH = 102;
-
-        g.fill(boxX, boxY, boxX + boxW, boxY + boxH, 0xFF090D16);
-        g.renderOutline(boxX, boxY, boxW, boxH, 0xFF1E293B);
-
-        g.drawCenteredString(this.font, "Emergency Minecart Rescue", boxX + boxW / 2, boxY + 6, 0xFFF87171);
-        g.drawCenteredString(this.font, "Sends a Villager in a 2-Car Minecart", boxX + boxW / 2, boxY + 18, 0xFF94A3B8);
-        g.drawCenteredString(this.font, "off-road to drive you to a Village!", boxX + boxW / 2, boxY + 28, 0xFF94A3B8);
-
-        // Big [CALL FOR HELP] Button (y+41 to y+61)
-        int btnX = boxX + 18;
-        int btnY = boxY + 41;
-        int btnW = boxW - 36;
-        int btnH = 20;
-        boolean canCall = bars > 0 && !isSatellite;
-        boolean hov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-        int bg = !canCall ? 0xFF334155 : (hov ? 0xFFEF4444 : 0xFFDC2626);
-        g.fill(btnX, btnY, btnX + btnW, btnY + btnH, bg);
-        g.renderOutline(btnX, btnY, btnW, btnH, canCall ? 0xFFFCA5A5 : 0xFF475569);
-        String btnLabel = isSatellite ? "CELL TOWER REQUIRED" : "🚨 CALL FOR HELP";
-        g.drawCenteredString(this.font, btnLabel, btnX + btnW / 2, btnY + 6, canCall ? 0xFFFFFFFF : 0xFF94A3B8);
-
-        // Active Rescue Tracking Box (y+66 to y+98)
-        int trkX = boxX + 6;
-        int trkY = boxY + 66;
-        int trkW = boxW - 12;
-        int trkH = 31;
-        g.fill(trkX, trkY, trkX + trkW, trkY + trkH, 0xFF111827);
-        g.renderOutline(trkX, trkY, trkW, trkH, 0xFF334155);
-
-        List<ModNetwork.OrderSnapshot> rescues = ClientPhoneState.getActiveOrders().stream()
-                .filter(order -> order.orderId().equals("RESCUE")).toList();
-        if (rescues.isEmpty()) {
-            g.drawCenteredString(this.font, "No active rescue call.", trkX + trkW / 2, trkY + 11, 0xFF64748B);
-        } else {
-            ModNetwork.OrderSnapshot r = rescues.get(0);
-            g.drawString(this.font, this.font.plainSubstrByWidth("Status: " + r.status(), trkW - 8), trkX + 4, trkY + 4, 0xFFFBBF24, false);
-            g.drawString(this.font, this.font.plainSubstrByWidth("Village Target: [" + r.destCoords() + "]", trkW - 8), trkX + 4, trkY + 14, 0xFF38BDF8, false);
-
-            int pbx = trkX + 4;
-            int pby = trkY + 24;
-            int pbw = trkW - 8;
-            g.fill(pbx, pby, pbx + pbw, pby + 4, 0xFF090D16);
-            int fillW = (int) (pbw * (r.progressPercent() / 100.0f));
-            g.fill(pbx, pby, pbx + fillW, pby + 4, 0xFF10B981);
-        }
-    }
-
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
@@ -393,10 +327,11 @@ public class PhoneScreen extends Screen {
                 for (int i = 0; i < APPS.length; i++) {
                     int tabX = x + 5 + i * (TAB_W + TAB_GAP);
                     if (mouseX >= tabX && mouseX < tabX + TAB_W) {
-                        if (i < 2) {
-                            this.currentApp = i;
+                        if (i == 0) {
                             this.scrollOffset = 0;
-                            updateInputVisibility();
+                            this.messageInputBox.setFocused(true);
+                        } else if (i == 1) {
+                            Minecraft.getInstance().setScreen(new EmergencyScreen(this));
                         } else {
                             var mode = i == 2 ? TownServices.Mode.DELIVERY : TownServices.Mode.RIDESHARE;
                             Minecraft.getInstance().setScreen(new TownServiceScreen(mode, this, 0));
@@ -407,43 +342,13 @@ public class PhoneScreen extends Screen {
                 }
             }
 
-            SignalManager.SignalStatus sig = SignalManager.getBestSignal(player, simNet);
-            int bars = sig.bars();
-
-            // 4. Messages [Send] Button
-            if (this.currentApp == 0) {
-                int sendX = x + PHONE_W - 40;
-                int sendY = y + 150;
-                if (mouseX >= sendX && mouseX <= sendX + 32 && mouseY >= sendY && mouseY <= sendY + 14) {
-                    sendCurrentMessage(bars);
-                    return true;
-                }
+            int sendX = x + PHONE_W - 40;
+            int sendY = y + 150;
+            if (mouseX >= sendX && mouseX <= sendX + 32 && mouseY >= sendY && mouseY <= sendY + 14) {
+                sendCurrentMessage(SignalManager.getBestSignal(player, simNet).bars());
+                return true;
             }
 
-            // 5. Help Call [CALL FOR HELP] Button
-            if (this.currentApp == 1) {
-                int boxX = x + 8;
-                int boxY = y + 64;
-                int boxW = PHONE_W - 16;
-                int btnX = boxX + 18;
-                int btnY = boxY + 41;
-                int btnW = boxW - 36;
-                int btnH = 20;
-                if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
-                    if (sig.connectedViaSatellite()) {
-                        showToast("Rescue needs a cell tower!", 0xFFFBBF24);
-                        return true;
-                    }
-                    if (bars <= 0) {
-                        showToast(simNet == null ? "Insert a SIM Card first!" : "No cell signal!", 0xFFEF4444);
-                        return true;
-                    }
-                    PacketDistributor.sendToServer(new ModNetwork.CallForHelpPayload(true));
-                    showToast("Rescue Minecart dispatched!", 0xFF34D399);
-                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.2f));
-                    return true;
-                }
-            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -471,13 +376,10 @@ public class PhoneScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (this.currentApp == 0) {
-            int total = ClientPhoneState.getMessages().size();
-            int maxScroll = Math.max(0, total - 3);
-            this.scrollOffset = Mth.clamp(this.scrollOffset - (int) Math.signum(scrollY) * 2, 0, maxScroll);
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        int total = ClientPhoneState.getMessages().size();
+        int maxScroll = Math.max(0, total - 3);
+        this.scrollOffset = Mth.clamp(this.scrollOffset - (int) Math.signum(scrollY) * 2, 0, maxScroll);
+        return true;
     }
 
     @Override
@@ -486,7 +388,7 @@ public class PhoneScreen extends Screen {
             this.onClose();
             return true;
         }
-        if (this.currentApp == 0 && this.messageInputBox != null && this.messageInputBox.isFocused()) {
+        if (this.messageInputBox != null && this.messageInputBox.isFocused()) {
             if (keyCode == 257 || keyCode == 335) {
                 Player player = Minecraft.getInstance().player;
                 String simNet = player != null ? DeliveryManager.findPlayerSimNetwork(player) : null;

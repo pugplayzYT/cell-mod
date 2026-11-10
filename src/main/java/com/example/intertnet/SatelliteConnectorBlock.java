@@ -45,7 +45,7 @@ public class SatelliteConnectorBlock extends CellTowerBlock {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
         tooltipComponents.add(Component.literal("Portable 64m Internet on the Go").withStyle(ChatFormatting.AQUA));
-        tooltipComponents.add(Component.literal("• Supports: Global Messaging (No Emergency Rescue)").withStyle(ChatFormatting.GRAY));
+        tooltipComponents.add(Component.literal("• Supports phone apps and SOS calls").withStyle(ChatFormatting.GRAY));
         tooltipComponents.add(Component.literal("• Fuel: Copper Ingots / Copper Blocks only").withStyle(ChatFormatting.GOLD));
         tooltipComponents.add(Component.literal("• Includes 1 Free SIM Card (extra SIMs cost Paper + Gold)").withStyle(ChatFormatting.GREEN));
     }

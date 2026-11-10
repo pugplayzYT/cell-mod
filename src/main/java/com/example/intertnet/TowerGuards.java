@@ -19,7 +19,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 final class TowerGuards {
-    private static final String GUARD = "intertnet_tower_guard";
+    static final String GUARD = "intertnet_tower_guard";
     private static final String HOME = "GuardTower";
     private static final String INTRUDER = "Intruder";
     private static final String ALARM_UNTIL = "AlarmUntil";

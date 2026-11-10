@@ -18,14 +18,17 @@ final class ServiceSiteStructure extends Structure {
     static final ResourceKey<Structure> RESTAURANT = key("restaurant");
     static final ResourceKey<Structure> RIDESHARE = key("rideshare_center");
     static final MapCodec<ServiceSiteStructure> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-            settingsCodec(instance), Codec.BOOL.fieldOf("restaurant").forGetter(site -> site.restaurant)
+            settingsCodec(instance), Codec.BOOL.fieldOf("restaurant").forGetter(site -> site.restaurant),
+            EmergencyService.CODEC.optionalFieldOf("emergency").forGetter(site -> site.emergency)
     ).apply(instance, ServiceSiteStructure::new));
 
     private final boolean restaurant;
+    private final Optional<EmergencyService> emergency;
 
-    private ServiceSiteStructure(StructureSettings settings, boolean restaurant) {
+    private ServiceSiteStructure(StructureSettings settings, boolean restaurant, Optional<EmergencyService> emergency) {
         super(settings);
         this.restaurant = restaurant;
+        this.emergency = emergency;
     }
 
     static ResourceKey<Structure> key(String path) {
@@ -34,11 +37,7 @@ final class ServiceSiteStructure extends Structure {
 
     @Override
     protected Optional<GenerationStub> findGenerationPoint(GenerationContext context) {
-        var towerSet = context.registryAccess().registryOrThrow(Registries.STRUCTURE_SET)
-                .get(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "public_cell_towers"));
-        if (towerSet != null && towerSet.placement() instanceof RandomSpreadStructurePlacement grid
-                && grid.getPotentialStructureChunk(context.seed(), context.chunkPos().x, context.chunkPos().z).equals(context.chunkPos())
-                && grid.applyAdditionalChunkRestrictions(context.chunkPos().x, context.chunkPos().z, context.seed())) {
+        if (isReserved(context, "public_cell_towers") || (emergency.isPresent() && isReserved(context, "service_sites"))) {
             return Optional.empty();
         }
         int x = context.chunkPos().getMinBlockX();
@@ -57,7 +56,16 @@ final class ServiceSiteStructure extends Structure {
         }
         boolean rooftop = restaurant && context.random().nextInt(3) == 0;
         return Optional.of(new GenerationStub(new BlockPos(x + 7, y + 1, z + 7),
-                builder -> builder.addPiece(new ServiceSitePiece(x, y, z, restaurant, rooftop))));
+                builder -> builder.addPiece(new ServiceSitePiece(x, y, z, restaurant, rooftop, emergency.orElse(null)))));
+    }
+
+    private static boolean isReserved(GenerationContext context, String setName) {
+        var set = context.registryAccess().registryOrThrow(Registries.STRUCTURE_SET)
+                .get(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, setName));
+        var chunk = context.chunkPos();
+        return set != null && set.placement() instanceof RandomSpreadStructurePlacement grid
+                && grid.getPotentialStructureChunk(context.seed(), chunk.x, chunk.z).equals(chunk)
+                && grid.applyAdditionalChunkRestrictions(chunk.x, chunk.z, context.seed());
     }
 
     private static int ground(GenerationContext context, int x, int z) {

@@ -270,6 +270,10 @@ final class ServiceTrip {
     }
 
     private Vec3 followGround(Vec3 at, double previousY, double targetY) {
+        return followGround(level, at, previousY, targetY);
+    }
+
+    static Vec3 followGround(ServerLevel level, Vec3 at, double previousY, double targetY) {
         double y = DeliveryManager.getGroundY(level, at.x, previousY, at.z, targetY);
         BlockPos column = BlockPos.containing(at);
         if (level.isLoaded(column)) {
@@ -279,9 +283,13 @@ final class ServiceTrip {
     }
 
     private void pinVehicleChunks(BlockPos at, BlockPos ahead) {
+        pinVehicleChunks(level, ticketId, vehicleTickets, BlockPos.containing(position), at, ahead);
+    }
+
+    static void pinVehicleChunks(ServerLevel level, UUID ticketId, Set<ChunkPos> vehicleTickets, BlockPos center, BlockPos at, BlockPos ahead) {
         Set<ChunkPos> wanted = new LinkedHashSet<>();
         wanted.add(new ChunkPos(at));
-        wanted.add(new ChunkPos(BlockPos.containing(position)));
+        wanted.add(new ChunkPos(center));
         wanted.add(new ChunkPos(ahead));
         for (ChunkPos chunk : wanted) {
             if (vehicleTickets.add(chunk)) {
@@ -387,9 +395,14 @@ final class ServiceTrip {
         for (ChunkPos chunk : corridorTickets) {
             level.getChunkSource().removeRegionTicket(TICKET, chunk, 0, ticketId);
         }
+        releaseVehicleChunks(level, ticketId, vehicleTickets);
+    }
+
+    static void releaseVehicleChunks(ServerLevel level, UUID ticketId, Set<ChunkPos> vehicleTickets) {
         for (ChunkPos chunk : vehicleTickets) {
             level.getChunkSource().removeRegionTicket(TICKET, chunk, ENTITY_TICKET_RADIUS, ticketId);
         }
+        vehicleTickets.clear();
     }
 
     static BlockPos safeSurface(ServerLevel level, BlockPos near) {

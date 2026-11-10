@@ -1,0 +1,17 @@
+{
+  "structures": [
+    { "structure": "intertnet:medic_station", "weight": 1 },
+    { "structure": "intertnet:police_station", "weight": 1 }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 19,
+    "separation": 10,
+    "salt": 41820463,
+    "locate_offset": [7, 0, 14],
+    "exclusion_zone": {
+      "other_set": "minecraft:villages",
+      "chunk_count": 4
+    }
+  }
+}

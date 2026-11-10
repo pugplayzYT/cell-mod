@@ -355,7 +355,7 @@ final class TownServices {
         }
     }
 
-    private static BlockPos nearest(ServerLevel level, ResourceKey<Structure> key, BlockPos from, int radius) {
+    static BlockPos nearest(ServerLevel level, ResourceKey<Structure> key, BlockPos from, int radius) {
         var structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).getHolder(key);
         if (structure.isEmpty()) {
             return null;

@@ -2,7 +2,7 @@
 
 A Minecraft 1.21.1 mod for NeoForge. Buy a phone and SIM at an Open World cell tower, build a private network, text other players, or use your phone to order meals and book rides.
 
-Public towers, restaurants, and rideshare centers generate in new chunks. Intertnet replaces normal player chat with phone messaging.
+Public towers, restaurants, rideshare centers, and emergency stations generate in new chunks. The phone's free SOS calls dispatch medics or police over cell or satellite reception. Intertnet replaces normal player chat with phone messaging.
 
 ## Build
 

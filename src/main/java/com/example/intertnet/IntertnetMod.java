@@ -145,6 +145,7 @@ public class IntertnetMod {
         NeoForge.EVENT_BUS.addListener(DeliveryManager::onServerTick);
         TownServices.register();
         TowerGuards.register();
+        EmergencyDispatch.register();
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientRegistrar.register(modEventBus);

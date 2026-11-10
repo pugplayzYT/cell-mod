@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ModNetwork {
+    static final int EMERGENCY_FEEDBACK = -1;
 
     public record OrderSnapshot(
             String orderId,
@@ -100,11 +101,11 @@ public class ModNetwork {
         }
     }
 
-    public record CallForHelpPayload(boolean dummy) implements CustomPacketPayload {
-        public static final Type<CallForHelpPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "call_for_help"));
-        public static final StreamCodec<ByteBuf, CallForHelpPayload> STREAM_CODEC = StreamCodec.composite(
-                ByteBufCodecs.BOOL, CallForHelpPayload::dummy,
-                CallForHelpPayload::new
+    public record EmergencyCallPayload(int service) implements CustomPacketPayload {
+        public static final Type<EmergencyCallPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "emergency_call"));
+        public static final StreamCodec<ByteBuf, EmergencyCallPayload> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, EmergencyCallPayload::service,
+                EmergencyCallPayload::new
         );
 
         @Override
@@ -235,7 +236,7 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("6");
+        final PayloadRegistrar registrar = event.registrar("7");
         registrar.playToServer(ServiceRequestPayload.TYPE, ServiceRequestPayload.STREAM_CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
@@ -249,11 +250,13 @@ public class ModNetwork {
                 (payload, context) -> context.enqueueWork(() -> ClientHooks.receiveServiceQuotes(payload)));
         registrar.playToClient(ServiceFeedbackPayload.TYPE, ServiceFeedbackPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientHooks.receiveServiceFeedback(payload)));
-        registrar.playToServer(
-                CallForHelpPayload.TYPE,
-                CallForHelpPayload.STREAM_CODEC,
-                ModNetwork::handleCallForHelp
-        );
+        registrar.playToServer(EmergencyCallPayload.TYPE, EmergencyCallPayload.STREAM_CODEC, (payload, context) -> {
+            context.enqueueWork(() -> {
+                if (context.player() instanceof ServerPlayer player) {
+                    EmergencyDispatch.request(player, payload.service());
+                }
+            });
+        });
         registrar.playToServer(
                 PrintSimCardPayload.TYPE,
                 PrintSimCardPayload.STREAM_CODEC,
@@ -279,40 +282,6 @@ public class ModNetwork {
                 SyncPhoneDataPayload.STREAM_CODEC,
                 ModNetwork::handleSyncPhoneData
         );
-    }
-
-    private static void handleCallForHelp(final CallForHelpPayload payload, final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)) {
-                return;
-            }
-            String simNet = DeliveryManager.findPlayerSimNetwork(player);
-            if (simNet == null) {
-                player.displayClientMessage(Component.literal("Help Call failed: No SIM Card inserted in your Phone!").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-            ServerLevel level = player.serverLevel();
-            SignalManager.SignalStatus signal = SignalManager.getBestSignal(player, simNet);
-            if (signal.bars() <= 0 || signal.connectedTowerPos() == null) {
-                player.displayClientMessage(Component.literal("Help Call failed: No cellular connection for your SIM Card!").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-
-            BlockEntity be = level.getBlockEntity(signal.connectedTowerPos());
-            if (!(be instanceof CellTowerBlockEntity tower) || !tower.isPowered() || !TowerNetworkManager.doesTowerMatchSim(level, tower, simNet)) {
-                player.displayClientMessage(Component.literal("Help Call failed: Cell Tower offline or SIM network mismatch!").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-            if (signal.connectedViaSatellite() || tower.isSatelliteConnector()) {
-                player.displayClientMessage(Component.literal("Emergency Rescue requires reception from a cell tower.")
-                        .withStyle(ChatFormatting.RED), true);
-                return;
-            }
-
-            tower.consumeServiceFuel(80);
-            DeliveryManager.startHelpCall(player, simNet, signal.connectedTowerPos(), signal.bars());
-            level.playSound(null, player.blockPosition(), SoundEvents.BELL_BLOCK, SoundSource.PLAYERS, 0.9f, 1.35f);
-        });
     }
 
     private static void handlePrintSimCard(final PrintSimCardPayload payload, final IPayloadContext context) {

@@ -32,6 +32,7 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 final class ServiceSitePiece extends StructurePiece {
     static final int HEIGHT = 12;
@@ -42,24 +43,29 @@ final class ServiceSitePiece extends StructurePiece {
     static final BlockPos KITCHEN_DOOR = new BlockPos(7, 1, 5);
     static final BlockPos PARKING = new BlockPos(7, 1, 8);
     static final BlockPos ENTRANCE = new BlockPos(7, 1, 14);
+    static final BlockPos EMERGENCY_BAY = new BlockPos(7, 1, 11);
     static final String CHEF_TAG = "intertnet_chef";
     static final String KITCHEN_TAG = "intertnet_kitchen";
     static final String SITE_POS = "IntertnetSite";
     private final boolean restaurant;
     private final boolean rooftop;
+    @Nullable
+    private final EmergencyService emergency;
     private boolean populated;
 
-    ServiceSitePiece(int x, int y, int z, boolean restaurant, boolean rooftop) {
+    ServiceSitePiece(int x, int y, int z, boolean restaurant, boolean rooftop, @Nullable EmergencyService emergency) {
         super(IntertnetMod.SERVICE_SITE_PIECE.get(), 0, new BoundingBox(x, y, z, x + 15, y + HEIGHT, z + 15));
         setOrientation(Direction.SOUTH);
         this.restaurant = restaurant;
         this.rooftop = rooftop;
+        this.emergency = emergency;
     }
 
     ServiceSitePiece(CompoundTag tag) {
         super(IntertnetMod.SERVICE_SITE_PIECE.get(), tag);
         restaurant = tag.getBoolean("Restaurant");
         rooftop = tag.getBoolean("Rooftop");
+        emergency = EmergencyService.CODEC.byName(tag.getString("Emergency"));
         populated = tag.getBoolean("Populated");
     }
 
@@ -68,6 +74,9 @@ final class ServiceSitePiece extends StructurePiece {
         tag.putBoolean("Restaurant", restaurant);
         tag.putBoolean("Rooftop", rooftop);
         tag.putBoolean("Populated", populated);
+        if (emergency != null) {
+            tag.putString("Emergency", emergency.getSerializedName());
+        }
     }
 
     @Override
@@ -77,8 +86,10 @@ final class ServiceSitePiece extends StructurePiece {
             return;
         }
         Block floor = restaurant ? Blocks.SPRUCE_PLANKS : Blocks.POLISHED_ANDESITE;
-        Block wall = restaurant ? Blocks.STRIPPED_OAK_WOOD : Blocks.STONE_BRICKS;
-        Block roof = restaurant ? Blocks.DARK_OAK_PLANKS : Blocks.DEEPSLATE_TILES;
+        Block wall = restaurant ? Blocks.STRIPPED_OAK_WOOD
+                : emergency == EmergencyService.MEDIC ? Blocks.SMOOTH_QUARTZ : Blocks.STONE_BRICKS;
+        Block roof = restaurant ? Blocks.DARK_OAK_PLANKS
+                : emergency == EmergencyService.MEDIC ? Blocks.WHITE_CONCRETE : Blocks.DEEPSLATE_TILES;
         int west = restaurant ? 1 : 2;
         int east = restaurant ? 13 : 12;
         for (int x = west; x <= east; x++) {
@@ -110,12 +121,13 @@ final class ServiceSitePiece extends StructurePiece {
             put(level, box, 3, 1, 11, Blocks.LANTERN);
             put(level, box, 11, 1, 11, Blocks.LANTERN);
         }
-        placeWallSign(level, box, 9, 3, 13, restaurant ? "RESTAURANT" : "RIDESHARE",
-                restaurant ? "Order inside" : "Dispatch center", restaurant ? "Eat in" : "Book by phone");
-
         if (restaurant) {
+            placeWallSign(level, box, 9, 3, 13, "RESTAURANT", "Order inside", "Eat in");
             buildRestaurant(level, box);
+        } else if (emergency != null) {
+            buildEmergencyStation(level, box);
         } else {
+            placeWallSign(level, box, 9, 3, 13, "RIDESHARE", "Dispatch center", "Book by phone");
             buildStation(level, box);
         }
         populated = true;
@@ -217,6 +229,40 @@ final class ServiceSitePiece extends StructurePiece {
         if (!populated) {
             spawn(level, staff(level, "Rideshare Dispatcher"), getWorldPos(5, 1, 5), 0);
             spawn(level, staff(level, "Rideshare Attendant"), getWorldPos(10, 1, 5), 0);
+        }
+    }
+
+    private void buildEmergencyStation(WorldGenLevel level, BoundingBox box) {
+        boolean medic = emergency == EmergencyService.MEDIC;
+        Block stripe = medic ? Blocks.RED_CONCRETE : Blocks.BLUE_CONCRETE;
+        fill(level, box, 2, 4, 12, 12, 4, 12, stripe);
+        fill(level, box, 7, 0, 3, 8, 0, 14, Blocks.LIGHT_GRAY_CONCRETE);
+        placeIronDoor(level, box, 7, 12, DoorHingeSide.LEFT);
+        placeIronDoor(level, box, 8, 12, DoorHingeSide.RIGHT);
+        generateAirBox(level, box, 7, 3, 12, 8, 3, 12);
+        placeWallSign(level, box, 9, 3, 13, medic ? "MEDIC STATION" : "POLICE STATION", "Free dispatch", "Call by phone");
+        for (int x : new int[]{4, 10}) {
+            hangLantern(level, box, x, 4);
+            hangLantern(level, box, x, 9);
+        }
+        if (medic) {
+            fill(level, box, 6, 6, 10, 8, 6, 10, Blocks.RED_CONCRETE);
+            fill(level, box, 7, 6, 9, 7, 6, 11, Blocks.RED_CONCRETE);
+            for (int x : new int[]{4, 10}) {
+                BlockState bed = Blocks.WHITE_BED.defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.BedBlock.FACING, Direction.SOUTH);
+                placeBlock(level, bed, x, 1, 4, box);
+                placeBlock(level, bed.setValue(net.minecraft.world.level.block.BedBlock.PART,
+                        net.minecraft.world.level.block.state.properties.BedPart.HEAD), x, 1, 3, box);
+                put(level, box, x, 1, 7, Blocks.BARREL);
+                put(level, box, x, 1, 8, Blocks.CAULDRON);
+            }
+        } else {
+            fill(level, box, 2, 6, 12, 12, 6, 12, Blocks.BLUE_CONCRETE);
+            for (int x : new int[]{4, 10}) {
+                fill(level, box, x, 1, 3, x, 2, 6, Blocks.IRON_BARS);
+                put(level, box, x, 1, 9, Blocks.SMITHING_TABLE);
+            }
         }
     }
 

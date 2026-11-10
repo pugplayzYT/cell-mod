@@ -46,7 +46,7 @@ public class GuidebookHelper {
                         .withStyle(ChatFormatting.DARK_AQUA, ChatFormatting.BOLD)
                         .append(Component.literal("\nCraft a ").withStyle(ChatFormatting.BLACK))
                         .append(Component.literal("Satellite Connector").withStyle(ChatFormatting.BOLD))
-                        .append(Component.literal(" (4 Copper + 1 Redstone + 1 Cobblestone) for 64m reception.\n• Runs on copper\n• 1 free SIM\n• Texts, Delivery, Rideshare").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal(" (4 Copper + 1 Redstone + 1 Cobblestone) for 64m reception.\n• Runs on copper\n• 1 free SIM\n• Supports all phone apps").withStyle(ChatFormatting.BLACK))),
 
                 page(Component.literal("6. Fuel & Range\n")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
@@ -68,19 +68,13 @@ public class GuidebookHelper {
                         .append(Component.literal("[Messages]").withStyle(ChatFormatting.BOLD))
                         .append(Component.literal(" tab on your Phone to text anyone in the world who has signal on ANY carrier or Satellite!").withStyle(ChatFormatting.BLACK))),
 
-                page(Component.literal("10. Help Call (1/2)\n")
+                page(Component.literal("10. Call Medics\n")
                         .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                        .append(Component.literal("\nConnected to a full Cell Tower?\nOpen ").withStyle(ChatFormatting.BLACK))
-                        .append(Component.literal("[Help Call]").withStyle(ChatFormatting.BOLD))
-                        .append(Component.literal(" and click ").withStyle(ChatFormatting.BLACK))
-                        .append(Component.literal("CALL FOR HELP").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD))
-                        .append(Component.literal(".\n\nA Villager in a 2-Minecart train drives out to you!").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal("\nOpen SOS with cell or satellite reception. Calling is free.\n\nMedics drive from their station and shoot healing arrows. Stay in view until you're treated.").withStyle(ChatFormatting.BLACK))),
 
-                page(Component.literal("11. Help Call (2/2)\n")
+                page(Component.literal("11. Call Police\n")
                         .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                        .append(Component.literal("\nWhen the 2-Minecart train arrives:\n\nRight-click the ").withStyle(ChatFormatting.BLACK))
-                        .append(Component.literal("back Minecart").withStyle(ChatFormatting.BOLD))
-                        .append(Component.literal(" to hop in!\n\nThe Villager will drive you off-road back to the nearest Village!").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal("\nCall Police for free in SOS. Four officers and two ravagers drive out.\n\nThey clear up to ten hostile mobs near your pickup and then leave.").withStyle(ChatFormatting.BLACK))),
 
                 page(Component.literal("12. Restaurants\n")
                         .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)

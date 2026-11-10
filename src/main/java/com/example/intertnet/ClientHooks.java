@@ -18,7 +18,9 @@ public class ClientHooks {
     }
 
     static void receiveServiceFeedback(ModNetwork.ServiceFeedbackPayload payload) {
-        if (Minecraft.getInstance().screen instanceof TownServiceScreen screen) {
+        if (payload.mode() == ModNetwork.EMERGENCY_FEEDBACK && Minecraft.getInstance().screen instanceof EmergencyScreen screen) {
+            screen.setFeedback(payload.message());
+        } else if (Minecraft.getInstance().screen instanceof TownServiceScreen screen) {
             screen.setFeedback(payload);
         }
     }
