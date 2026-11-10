@@ -28,8 +28,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -50,11 +52,14 @@ final class ServiceSitePiece extends StructurePiece {
     static final String CHEF_TAG = "intertnet_chef";
     static final String KITCHEN_TAG = "intertnet_kitchen";
     static final String SITE_POS = "IntertnetSite";
+    private static final int APPROACH_START = 13;
+    private static final int APPROACH_END = 15;
     private final boolean restaurant;
     private final boolean rooftop;
     @Nullable
     private final EmergencyService emergency;
     private boolean populated;
+    private boolean narrowApproach;
 
     ServiceSitePiece(int x, int y, int z, boolean restaurant, boolean rooftop, @Nullable EmergencyService emergency) {
         super(IntertnetMod.SERVICE_SITE_PIECE.get(), 0, new BoundingBox(x, y, z, x + 15, y + HEIGHT, z + 15));
@@ -70,6 +75,7 @@ final class ServiceSitePiece extends StructurePiece {
         rooftop = tag.getBoolean("Rooftop");
         emergency = EmergencyService.CODEC.byName(tag.getString("Emergency"));
         populated = tag.getBoolean("Populated");
+        narrowApproach = tag.getBoolean("NarrowApproach");
     }
 
     @Override
@@ -79,6 +85,7 @@ final class ServiceSitePiece extends StructurePiece {
         tag.putBoolean("Populated", populated);
         if (emergency != null) {
             tag.putString("Emergency", emergency.getSerializedName());
+            tag.putBoolean("NarrowApproach", narrowApproach);
         }
     }
 
@@ -94,13 +101,15 @@ final class ServiceSitePiece extends StructurePiece {
                 : emergency == EmergencyService.MEDIC ? Blocks.WHITE_CONCRETE : Blocks.DEEPSLATE_TILES;
         int west = restaurant ? 1 : 2;
         int east = restaurant ? 13 : 12;
+        int approachWest = emergency == null ? 5 : 7;
+        int approachEast = emergency == null ? 9 : 8;
         for (int x = west; x <= east; x++) {
             for (int z = 2; z <= 12; z++) {
                 fillColumnDown(level, Blocks.STONE_BRICKS.defaultBlockState(), x, -1, z, box);
             }
         }
-        for (int x = 5; x <= 9; x++) {
-            for (int z = 13; z <= 15; z++) {
+        for (int x = approachWest; x <= approachEast; x++) {
+            for (int z = APPROACH_START; z <= APPROACH_END; z++) {
                 fillColumnDown(level, Blocks.STONE_BRICKS.defaultBlockState(), x, -1, z, box);
             }
         }
@@ -109,8 +118,8 @@ final class ServiceSitePiece extends StructurePiece {
         // Keep the walls four blocks high and clear the full interior.
         generateAirBox(level, box, west + 1, 1, 3, east - 1, 4, 11);
         fill(level, box, west, 5, 2, east, 5, 12, roof);
-        fill(level, box, 5, 0, 12, 9, 0, 15, Blocks.POLISHED_ANDESITE);
-        generateAirBox(level, box, 5, 1, 13, 9, 3, 15);
+        fill(level, box, approachWest, 0, 12, approachEast, 0, APPROACH_END, Blocks.POLISHED_ANDESITE);
+        generateAirBox(level, box, approachWest, 1, APPROACH_START, approachEast, 3, APPROACH_END);
         for (int x : new int[]{4, 5, 10, 11}) {
             put(level, box, x, 2, 12, Blocks.GLASS);
         }
@@ -128,6 +137,7 @@ final class ServiceSitePiece extends StructurePiece {
             buildRestaurant(level, box);
         } else if (emergency != null) {
             buildEmergencyStation(level, box);
+            narrowApproach = true;
         } else {
             placeWallSign(level, box, 9, 3, 13, "RIDESHARE", "Dispatch center", "Book by phone");
             buildStation(level, box);
@@ -275,7 +285,16 @@ final class ServiceSitePiece extends StructurePiece {
         return service == EmergencyService.MEDIC ? Blocks.SMOOTH_QUARTZ : Blocks.STONE_BRICKS;
     }
 
-    static void repairEmergencyStation(ServerLevel level, BlockPos origin, EmergencyService service) {
+    static void repairEmergencyStation(ServerLevel level, LevelChunk chunk, StructureStart start) {
+        for (StructurePiece piece : start.getPieces()) {
+            if (piece instanceof ServiceSitePiece site && site.emergency != null) {
+                site.repairEmergencyStation(level, chunk, site.emergency);
+            }
+        }
+    }
+
+    private void repairEmergencyStation(ServerLevel level, LevelChunk chunk, EmergencyService service) {
+        BlockPos origin = getWorldPos(0, 0, 0);
         Block stripe = service == EmergencyService.MEDIC ? Blocks.RED_CONCRETE : Blocks.BLUE_CONCRETE;
         for (int x : new int[]{7, 8}) {
             BlockPos door = origin.offset(x, 1, 12);
@@ -286,6 +305,11 @@ final class ServiceSitePiece extends StructurePiece {
             }
         }
         setEmergencyGarage(level, origin, service, false);
+        if (!narrowApproach) {
+            trimOldApproach(level, origin);
+            narrowApproach = true;
+            chunk.setUnsaved(true);
+        }
         for (int x = 7; x <= 8; x++) {
             for (int z = 12; z <= 14; z++) {
                 BlockPos paving = origin.offset(x, 0, z);
@@ -300,6 +324,25 @@ final class ServiceSitePiece extends StructurePiece {
                 BlockPos chair = origin.offset(offset);
                 if (level.getBlockState(chair).isAir()) {
                     level.setBlockAndUpdate(chair, stair);
+                }
+            }
+        }
+    }
+
+    private static void trimOldApproach(ServerLevel level, BlockPos origin) {
+        for (int x : new int[]{5, 6, 9}) {
+            for (int z = APPROACH_START; z <= APPROACH_END; z++) {
+                BlockPos paving = origin.offset(x, 0, z);
+                if (!level.getBlockState(paving).is(Blocks.POLISHED_ANDESITE)
+                        || !level.getBlockState(paving.above()).isAir()) {
+                    continue;
+                }
+                level.removeBlock(paving, false);
+                // Old approaches used stone bricks to fill the space down to solid ground.
+                BlockPos support = paving.below();
+                while (support.getY() >= level.getMinBuildHeight() && level.getBlockState(support).is(Blocks.STONE_BRICKS)) {
+                    level.removeBlock(support, false);
+                    support = support.below();
                 }
             }
         }

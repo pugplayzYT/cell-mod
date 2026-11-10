@@ -31,6 +31,7 @@ import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
@@ -69,7 +70,7 @@ final class EmergencyDispatch {
     private static final Queue<StationRepair> pendingRepairs = new ConcurrentLinkedQueue<>();
 
     private record Call(UUID owner, EmergencyService service) {}
-    private record StationRepair(ServerLevel level, BlockPos origin, EmergencyService service) {}
+    private record StationRepair(ServerLevel level, StructureStart start) {}
     private enum Phase {
         LOADING, LEAVING_STATION, EN_ROUTE, BOARDING, RETURNING, ENTERING_STATION, TREATMENT, WAITING_FOR_EXIT,
         ON_SCENE, LEAVING
@@ -146,12 +147,8 @@ final class EmergencyDispatch {
             return;
         }
         for (var start : event.getChunk().getAllStarts().values()) {
-            if (start.isValid() && start.getStructure() instanceof ServiceSiteStructure site) {
-                site.emergency().ifPresent(service -> {
-                    ChunkPos chunk = start.getChunkPos();
-                    BlockPos origin = new BlockPos(chunk.getMinBlockX(), start.getBoundingBox().minY(), chunk.getMinBlockZ());
-                    pendingRepairs.add(new StationRepair(level, origin, service));
-                });
+            if (start.isValid() && start.getStructure() instanceof ServiceSiteStructure site && site.emergency().isPresent()) {
+                pendingRepairs.add(new StationRepair(level, start));
             }
         }
     }
@@ -159,12 +156,13 @@ final class EmergencyDispatch {
     private static void repairLoadedStations() {
         StationRepair repair;
         while ((repair = pendingRepairs.poll()) != null) {
-            ChunkPos chunk = new ChunkPos(repair.origin);
+            ChunkPos pos = repair.start.getChunkPos();
             ServerLevel level = repair.level;
-            if (level.getChunkSource().getChunkNow(chunk.x, chunk.z) != null
+            var chunk = level.getChunkSource().getChunkNow(pos.x, pos.z);
+            if (chunk != null && chunk.getStartForStructure(repair.start.getStructure()) == repair.start
                     && responses.values().stream().noneMatch(response -> response.level == level
-                    && response.stationChunk.equals(chunk) && response.usesGarage())) {
-                ServiceSitePiece.repairEmergencyStation(level, repair.origin, repair.service);
+                    && response.stationChunk.equals(pos) && response.usesGarage())) {
+                ServiceSitePiece.repairEmergencyStation(level, chunk, repair.start);
             }
         }
     }
@@ -404,7 +402,7 @@ final class EmergencyDispatch {
                 return true;
             }
             origin = new BlockPos(stationChunk.getMinBlockX(), start.getBoundingBox().minY(), stationChunk.getMinBlockZ());
-            ServiceSitePiece.repairEmergencyStation(level, origin, service);
+            ServiceSitePiece.repairEmergencyStation(level, chunk, start);
             lead = Vec3.atBottomCenterOf(origin.offset(ServiceSitePiece.EMERGENCY_BAY)).add(0.5, 0, 0);
             int cartCount = service == EmergencyService.MEDIC ? 2 : 6;
             for (int i = 0; i < cartCount; i++) {
