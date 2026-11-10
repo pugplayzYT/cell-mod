@@ -64,9 +64,9 @@ final class EmergencyScreen extends Screen {
             if (tracking.isPresent()) {
                 var order = tracking.get();
                 drawLine(graphics, order.status(), y, 0xFFFBBF24);
-                drawLine(graphics, "Pickup " + order.destCoords(), y + 10, 0xFF94A3B8);
+                drawLine(graphics, order.destCoords(), y + 10, 0xFF94A3B8);
             } else {
-                drawLine(graphics, service == EmergencyService.MEDIC ? "Restores health with healing arrows"
+                drawLine(graphics, service == EmergencyService.MEDIC ? "Ambulance ride to the clinic"
                         : "Four officers and two ravagers", y, 0xFF94A3B8);
             }
         }

@@ -30,6 +30,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
@@ -65,11 +66,14 @@ final class EmergencyDispatch {
     private static final String RESPONSE_TAG = "intertnet_emergency_response";
     private static final String RESPONSE_ID = "IntertnetResponse";
     private static final Map<Call, Response> responses = new HashMap<>();
-    private static final Queue<GarageRepair> pendingRepairs = new ConcurrentLinkedQueue<>();
+    private static final Queue<StationRepair> pendingRepairs = new ConcurrentLinkedQueue<>();
 
     private record Call(UUID owner, EmergencyService service) {}
-    private record GarageRepair(ServerLevel level, BlockPos origin, EmergencyService service) {}
-    private enum Phase { LOADING, LEAVING_STATION, EN_ROUTE, ON_SCENE, LEAVING }
+    private record StationRepair(ServerLevel level, BlockPos origin, EmergencyService service) {}
+    private enum Phase {
+        LOADING, LEAVING_STATION, EN_ROUTE, BOARDING, RETURNING, ENTERING_STATION, TREATMENT, WAITING_FOR_EXIT,
+        ON_SCENE, LEAVING
+    }
     private record Unit(Raider responder, Minecart cart) {}
 
     static void register() {
@@ -80,6 +84,7 @@ final class EmergencyDispatch {
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onEntityLoad);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onInteract);
+        NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onInteractAt);
         NeoForge.EVENT_BUS.addListener(EmergencyDispatch::onStop);
     }
 
@@ -122,13 +127,14 @@ final class EmergencyDispatch {
     }
 
     private static void tick(ServerTickEvent.Post event) {
-        repairLoadedGarages();
+        repairLoadedStations();
         var iterator = responses.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
             Response response = entry.getValue();
             ServerPlayer owner = event.getServer().getPlayerList().getPlayer(entry.getKey().owner());
-            if (owner == null || !owner.isAlive() || owner.serverLevel() != response.level || !response.tick(owner)) {
+            if (owner == null || !owner.isAlive() || owner.isSpectator()
+                    || owner.serverLevel() != response.level || !response.tick(owner)) {
                 response.close();
                 iterator.remove();
             }
@@ -144,21 +150,21 @@ final class EmergencyDispatch {
                 site.emergency().ifPresent(service -> {
                     ChunkPos chunk = start.getChunkPos();
                     BlockPos origin = new BlockPos(chunk.getMinBlockX(), start.getBoundingBox().minY(), chunk.getMinBlockZ());
-                    pendingRepairs.add(new GarageRepair(level, origin, service));
+                    pendingRepairs.add(new StationRepair(level, origin, service));
                 });
             }
         }
     }
 
-    private static void repairLoadedGarages() {
-        GarageRepair repair;
+    private static void repairLoadedStations() {
+        StationRepair repair;
         while ((repair = pendingRepairs.poll()) != null) {
             ChunkPos chunk = new ChunkPos(repair.origin);
             ServerLevel level = repair.level;
             if (level.getChunkSource().getChunkNow(chunk.x, chunk.z) != null
                     && responses.values().stream().noneMatch(response -> response.level == level
-                    && response.stationChunk.equals(chunk) && response.phase == Phase.LEAVING_STATION)) {
-                ServiceSitePiece.repairEmergencyGarage(level, repair.origin, repair.service);
+                    && response.stationChunk.equals(chunk) && response.usesGarage())) {
+                ServiceSitePiece.repairEmergencyStation(level, repair.origin, repair.service);
             }
         }
     }
@@ -221,7 +227,37 @@ final class EmergencyDispatch {
         if (event.getTarget().getTags().contains(RESPONSE_TAG)) {
             event.setCancellationResult(InteractionResult.CONSUME);
             event.setCanceled(true);
+            boardAmbulance(event.getEntity(), event.getHand(), event.getTarget());
         }
+    }
+
+    private static void onInteractAt(PlayerInteractEvent.EntityInteractSpecific event) {
+        if (event.getTarget().getTags().contains(RESPONSE_TAG)) {
+            event.setCancellationResult(InteractionResult.CONSUME);
+            event.setCanceled(true);
+            boardAmbulance(event.getEntity(), event.getHand(), event.getTarget());
+        }
+    }
+
+    private static void boardAmbulance(Entity entity, InteractionHand hand, Entity target) {
+        if (hand != InteractionHand.MAIN_HAND || !(entity instanceof ServerPlayer player)) {
+            return;
+        }
+        Response response = responses.get(new Call(player.getUUID(), EmergencyService.MEDIC));
+        if (response != null && response.phase == Phase.BOARDING && target == response.patientCart) {
+            if (player.isShiftKeyDown()) {
+                player.displayClientMessage(Component.literal("Release sneak, then right-click the ambulance seat."), true);
+            } else if (player.startRiding(response.patientCart, true)) {
+                response.initialDistance = Math.max(1, ServiceTrip.horizontalDistance(response.lead, response.approach()));
+                response.sceneDeadline = response.level.getGameTime() + 20L * 8 * 60;
+                response.phase = Phase.RETURNING;
+                notify(player, "On the way to the medic station.");
+            }
+        }
+    }
+
+    static boolean isTreatmentSeat(DiningSeat seat) {
+        return seat.getTags().contains(RESPONSE_TAG);
     }
 
     private static void onEntityLoad(EntityJoinLevelEvent event) {
@@ -266,6 +302,9 @@ final class EmergencyDispatch {
         private Vec3 lead;
         private Vec3 forward = new Vec3(0, 0, 1);
         private Vec3 departure;
+        private Minecart patientCart;
+        private DiningSeat treatmentSeat;
+        private BlockPos chair;
         private long sceneDeadline;
         private long clearSince;
         private long departDeadline;
@@ -286,19 +325,32 @@ final class EmergencyDispatch {
         boolean tick(ServerPlayer owner) {
             long now = level.getGameTime();
             arrows.removeIf(Entity::isRemoved);
-            if (phase.ordinal() < Phase.ON_SCENE.ordinal() && now >= arrivalDeadline) {
+            if (outbound() && now >= arrivalDeadline) {
                 EmergencyDispatch.notify(owner, service.label + " couldn't reach the pickup.");
                 return false;
             }
             if (phase == Phase.LOADING) {
                 return dispatch(owner);
             }
-            if (units.stream().noneMatch(unit -> unit.responder.isAlive())) {
+            if (phase != Phase.WAITING_FOR_EXIT && units.stream().noneMatch(unit -> unit.responder.isAlive())) {
+                if ((phase == Phase.TREATMENT || phase == Phase.ENTERING_STATION) && insideClinic(owner)) {
+                    finishTreatment(owner, "The crew is down. You can leave the clinic.");
+                    return true;
+                }
                 EmergencyDispatch.notify(owner, "The " + service.getSerializedName() + " crew is down.");
                 return false;
             }
+            if (service == EmergencyService.MEDIC && phase != Phase.TREATMENT && phase != Phase.WAITING_FOR_EXIT
+                    && !patientCart.isAlive()) {
+                if (phase == Phase.ENTERING_STATION && insideClinic(owner)) {
+                    finishTreatment(owner, "The ambulance seat is unavailable. The doors are open.");
+                    return true;
+                }
+                EmergencyDispatch.notify(owner, "The ambulance seat is unavailable.");
+                return false;
+            }
             if (phase == Phase.LEAVING_STATION) {
-                Vec3 exit = Vec3.atBottomCenterOf(origin.offset(7, 1, 22)).add(0.5, 0, 0);
+                Vec3 exit = approach();
                 if (ServiceTrip.horizontalDistance(lead, exit) > 0.2) {
                     advance(exit, true);
                 } else {
@@ -313,11 +365,21 @@ final class EmergencyDispatch {
                     arrive(owner);
                 }
             } else if (phase == Phase.ON_SCENE) {
-                if (service == EmergencyService.MEDIC) {
-                    treat(owner, now);
-                } else {
-                    patrol(owner, now);
+                patrol(owner, now);
+            } else if (phase == Phase.BOARDING) {
+                if (now >= sceneDeadline) {
+                    EmergencyDispatch.notify(owner, "The ambulance left after waiting for you.");
+                    return false;
                 }
+            } else if (phase == Phase.RETURNING || phase == Phase.ENTERING_STATION) {
+                return returnToClinic(owner, now);
+            } else if (phase == Phase.TREATMENT) {
+                if (!insideClinic(owner)) {
+                    return false;
+                }
+                treat(owner, now);
+            } else if (phase == Phase.WAITING_FOR_EXIT) {
+                return insideClinic(owner);
             } else {
                 if (now >= departDeadline || ServiceTrip.horizontalDistance(lead, departure) < 1) {
                     return false;
@@ -338,13 +400,11 @@ final class EmergencyDispatch {
                 EmergencyDispatch.notify(owner, "The station is unavailable.");
                 return false;
             }
-            for (Response other : responses.values()) {
-                if (other != this && other.level == level && other.stationChunk.equals(stationChunk)
-                        && other.phase == Phase.LEAVING_STATION) {
-                    return true;
-                }
+            if (garageOccupied()) {
+                return true;
             }
             origin = new BlockPos(stationChunk.getMinBlockX(), start.getBoundingBox().minY(), stationChunk.getMinBlockZ());
+            ServiceSitePiece.repairEmergencyStation(level, origin, service);
             lead = Vec3.atBottomCenterOf(origin.offset(ServiceSitePiece.EMERGENCY_BAY)).add(0.5, 0, 0);
             int cartCount = service == EmergencyService.MEDIC ? 2 : 6;
             for (int i = 0; i < cartCount; i++) {
@@ -353,6 +413,15 @@ final class EmergencyDispatch {
                     EmergencyDispatch.notify(owner, "The station could not deploy a crew.");
                     return false;
                 }
+            }
+            if (service == EmergencyService.MEDIC) {
+                patientCart = EntityType.MINECART.create(level);
+                if (patientCart == null || !spawnCart(patientCart, lead.subtract(forward.scale(CART_GAP * cartCount)))) {
+                    EmergencyDispatch.notify(owner, "The station could not deploy an ambulance seat.");
+                    return false;
+                }
+                patientCart.setCustomName(Component.literal("Ambulance Seat"));
+                patientCart.setCustomNameVisible(true);
             }
             doors(true);
             phase = Phase.LEAVING_STATION;
@@ -366,7 +435,6 @@ final class EmergencyDispatch {
             }
             var responder = ravager ? new ServiceRavager(level) : new ServicePillager(level, service);
             units.add(new Unit(responder, cart));
-            tag(cart);
             tag(responder);
             responder.setPersistenceRequired();
             responder.setCanJoinRaid(false);
@@ -374,11 +442,16 @@ final class EmergencyDispatch {
             responder.setCustomName(Component.literal(ravager ? "Police Ravager"
                     : service == EmergencyService.MEDIC ? "Medic" : "Police Officer"));
             responder.setCustomNameVisible(true);
+            responder.moveTo(position.x, position.y, position.z, 0, 0);
+            return spawnCart(cart, position) && level.addFreshEntity(responder) && responder.startRiding(cart, true);
+        }
+
+        private boolean spawnCart(Minecart cart, Vec3 position) {
+            tag(cart);
             cart.setNoGravity(true);
             cart.setInvulnerable(true);
             cart.moveTo(position.x, position.y, position.z, 0, 0);
-            responder.moveTo(position.x, position.y, position.z, 0, 0);
-            return level.addFreshEntity(cart) && level.addFreshEntity(responder) && responder.startRiding(cart, true);
+            return level.addFreshEntity(cart);
         }
 
         private void tag(Entity entity) {
@@ -390,7 +463,8 @@ final class EmergencyDispatch {
             Vec3 delta = target.subtract(lead).multiply(1, 0, 1);
             Vec3 direction = delta.normalize();
             Vec3 next = lead.add(direction.scale(Math.min(SPEED, delta.length())));
-            Vec3 tail = next.subtract(direction.scale(CART_GAP * (units.size() - 1)));
+            int cartCount = units.size() + (patientCart == null ? 0 : 1);
+            Vec3 tail = next.subtract(direction.scale(CART_GAP * (cartCount - 1)));
             BlockPos nextBlock = BlockPos.containing(next);
             BlockPos tailBlock = BlockPos.containing(tail);
             pin(nextBlock, tailBlock, BlockPos.containing(next.add(direction.scale(32))));
@@ -400,8 +474,8 @@ final class EmergencyDispatch {
             lead = flat ? next : ServiceTrip.followGround(level, next, lead.y, target.y);
             forward = direction;
             float yaw = (float) Math.toDegrees(Mth.atan2(direction.z, direction.x));
-            for (int i = 0; i < units.size(); i++) {
-                Minecart cart = units.get(i).cart;
+            for (int i = 0; i < cartCount; i++) {
+                Minecart cart = i < units.size() ? units.get(i).cart : patientCart;
                 if (cart.isAlive()) {
                     Vec3 at = lead.subtract(direction.scale(CART_GAP * i));
                     if (!flat && i > 0) {
@@ -418,9 +492,15 @@ final class EmergencyDispatch {
         }
 
         private void arrive(ServerPlayer owner) {
+            if (service == EmergencyService.MEDIC) {
+                phase = Phase.BOARDING;
+                sceneDeadline = level.getGameTime() + 20L * 120;
+                EmergencyDispatch.notify(owner, "Ambulance arrived. Right-click the rear cart to board.");
+                return;
+            }
             phase = Phase.ON_SCENE;
             clearSince = level.getGameTime();
-            sceneDeadline = clearSince + 20L * (service == EmergencyService.MEDIC ? 180 : 300);
+            sceneDeadline = clearSince + 20L * 300;
             for (Unit unit : units) {
                 var responder = unit.responder;
                 if (responder.isAlive()) {
@@ -428,21 +508,125 @@ final class EmergencyDispatch {
                     responder.setNoAi(false);
                 }
             }
-            EmergencyDispatch.notify(owner, service == EmergencyService.MEDIC
-                    ? "Medics arrived. Stay in view so they can treat you."
-                    : "Police arrived. The squad is clearing nearby hostile mobs.");
+            EmergencyDispatch.notify(owner, "Police arrived. The squad is clearing nearby hostile mobs.");
+        }
+
+        private Vec3 approach() {
+            return Vec3.atBottomCenterOf(origin.offset(7, 1, 22)).add(0.5, 0, 0);
+        }
+
+        private boolean outbound() {
+            return phase == Phase.LOADING || phase == Phase.LEAVING_STATION || phase == Phase.EN_ROUTE;
+        }
+
+        private boolean usesGarage() {
+            return phase == Phase.LEAVING_STATION || phase == Phase.ENTERING_STATION || phase == Phase.WAITING_FOR_EXIT;
+        }
+
+        private boolean garageOccupied() {
+            return responses.values().stream().anyMatch(other -> other != this && other.level == level
+                    && other.stationChunk.equals(stationChunk) && other.usesGarage());
+        }
+
+        private boolean returnToClinic(ServerPlayer owner, long now) {
+            if (!patientCart.hasPassenger(owner)) {
+                if (phase == Phase.ENTERING_STATION && insideClinic(owner)) {
+                    finishTreatment(owner, "You got out of the ambulance. The doors are open.");
+                    return true;
+                }
+                EmergencyDispatch.notify(owner, "Medic transport ended because you got out of the ambulance.");
+                return false;
+            }
+            if (phase == Phase.RETURNING) {
+                if (now >= sceneDeadline) {
+                    EmergencyDispatch.notify(owner, "The ambulance couldn't get you into the clinic.");
+                    return false;
+                }
+                Vec3 approach = approach();
+                if (ServiceTrip.horizontalDistance(lead, approach) > 0.2) {
+                    advance(approach, false);
+                } else if (!garageOccupied()) {
+                    for (BlockPos offset : ServiceSitePiece.MEDIC_CHAIRS) {
+                        BlockPos candidate = origin.offset(offset);
+                        if (level.getBlockState(candidate).is(Blocks.SPRUCE_STAIRS)
+                                && level.getBlockState(candidate.above()).isAir()
+                                && responses.values().stream().noneMatch(other -> other.level == level
+                                && candidate.equals(other.chair))) {
+                            chair = candidate;
+                            doors(true);
+                            phase = Phase.ENTERING_STATION;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                Vec3 threshold = Vec3.atBottomCenterOf(origin.offset(7, 1, 15)).add(0.5, 0, 0);
+                Vec3 bay = Vec3.atBottomCenterOf(origin.offset(7, 1, 6)).add(0.5, 0, 0);
+                if (lead.z > threshold.z + 0.2) {
+                    advance(threshold, false);
+                } else if (ServiceTrip.horizontalDistance(lead, bay) > 0.2) {
+                    advance(bay, true);
+                } else if (!seatPatient(owner)) {
+                    finishTreatment(owner, "The clinic seat is unavailable. The doors are open.");
+                }
+            }
+            return true;
+        }
+
+        private boolean seatPatient(ServerPlayer owner) {
+            treatmentSeat = IntertnetMod.DINING_SEAT.get().create(level);
+            if (treatmentSeat == null) {
+                return false;
+            }
+            Vec3 seat = Vec3.atBottomCenterOf(chair).add(0, 0.48, 0.2);
+            treatmentSeat.moveTo(seat.x, seat.y, seat.z, 0, 0);
+            tag(treatmentSeat);
+            if (!level.addFreshEntity(treatmentSeat) || !owner.startRiding(treatmentSeat, true)) {
+                return false;
+            }
+            discardAmbulance();
+            for (int i = 0; i < units.size(); i++) {
+                Raider medic = units.get(i).responder;
+                if (medic.isAlive()) {
+                    Vec3 stand = Vec3.atBottomCenterOf(origin.offset(6 + 2 * i, 1, 10));
+                    medic.moveTo(stand.x, stand.y, stand.z, 180, 0);
+                    medic.setNoAi(false);
+                }
+            }
+            // Keep the ward and its entrance loaded until the patient leaves.
+            pin(origin, origin, origin);
+            doors(false);
+            phase = Phase.TREATMENT;
+            sceneDeadline = level.getGameTime() + 20L * 180;
+            EmergencyDispatch.notify(owner, "You're in a treatment chair. The medics will restore your health.");
+            return true;
+        }
+
+        private void discardAmbulance() {
+            if (patientCart != null) {
+                patientCart.discard();
+                patientCart = null;
+            }
+            for (Unit unit : units) {
+                unit.responder.stopRiding();
+                unit.cart.discard();
+            }
+        }
+
+        private boolean insideClinic(ServerPlayer owner) {
+            double x = owner.getX() - origin.getX();
+            double y = owner.getY() - origin.getY();
+            double z = owner.getZ() - origin.getZ();
+            return x > 1.7 && x < 13.3 && y >= 0 && y < 5 && z > 1.7 && z < 13.3;
         }
 
         private void treat(ServerPlayer owner, long now) {
             if (owner.getHealth() >= owner.getMaxHealth()) {
-                leave(owner, "Treatment complete. The medics are leaving.");
+                finishTreatment(owner, "Treatment complete. The doors are open.");
                 return;
             }
             if (now >= sceneDeadline) {
-                leave(owner, "Medics ended the call. You can call again.");
-                return;
-            }
-            if (!nearScene(owner)) {
+                finishTreatment(owner, "Treatment has ended. The doors are open.");
                 return;
             }
             for (int i = 0; i < units.size(); i++) {
@@ -465,6 +649,33 @@ final class EmergencyDispatch {
                     shoot(medic, owner);
                 }
             }
+        }
+
+        private void finishTreatment(ServerPlayer owner, String message) {
+            clearArrows();
+            for (Unit unit : units) {
+                if (unit.responder instanceof ServicePillager medic) {
+                    medic.setChargingCrossbow(false);
+                }
+            }
+            if (garageOccupied()) {
+                return;
+            }
+            if (treatmentSeat != null) {
+                if (treatmentSeat.hasPassenger(owner)) {
+                    owner.stopRiding();
+                }
+                treatmentSeat.discard();
+                treatmentSeat = null;
+            }
+            if (patientCart != null && patientCart.hasPassenger(owner)) {
+                owner.stopRiding();
+            }
+            discardAmbulance();
+            chair = null;
+            doors(true);
+            phase = Phase.WAITING_FOR_EXIT;
+            EmergencyDispatch.notify(owner, message);
         }
 
         private void shoot(Pillager medic, ServerPlayer owner) {
@@ -527,8 +738,7 @@ final class EmergencyDispatch {
 
         private void leave(ServerPlayer owner, String message) {
             EmergencyDispatch.notify(owner, message);
-            arrows.forEach(Entity::discard);
-            arrows.clear();
+            clearArrows();
             for (Unit unit : units) {
                 var responder = unit.responder;
                 if (responder.isAlive() && unit.cart.isAlive()) {
@@ -546,6 +756,11 @@ final class EmergencyDispatch {
             phase = Phase.LEAVING;
         }
 
+        private void clearArrows() {
+            arrows.forEach(Entity::discard);
+            arrows.clear();
+        }
+
         private void doors(boolean open) {
             if (origin != null && level.isLoaded(origin)) {
                 ServiceSitePiece.setEmergencyGarage(level, origin, service, open);
@@ -553,29 +768,43 @@ final class EmergencyDispatch {
         }
 
         ModNetwork.OrderSnapshot snapshot() {
-            int distance = phase.ordinal() < Phase.ON_SCENE.ordinal()
-                    ? (int) Math.ceil(ServiceTrip.horizontalDistance(lead, Vec3.atBottomCenterOf(pickup))) : 0;
+            Vec3 destination = phase == Phase.RETURNING ? approach() : Vec3.atBottomCenterOf(pickup);
+            int distance = outbound() || phase == Phase.RETURNING
+                    ? (int) Math.ceil(ServiceTrip.horizontalDistance(lead, destination)) : 0;
             String status = switch (phase) {
                 case LOADING -> "Preparing at station";
                 case LEAVING_STATION, EN_ROUTE -> distance + "m away";
-                case ON_SCENE -> service == EmergencyService.MEDIC ? "On scene · treating"
-                        : "On scene · " + Math.min(kills, KILL_TARGET) + "/" + KILL_TARGET + " cleared";
+                case BOARDING -> "At pickup · board rear cart";
+                case RETURNING -> distance > 1 ? "To clinic · " + distance + "m" : "Waiting for a clinic bay";
+                case ENTERING_STATION -> "Entering the clinic";
+                case TREATMENT -> "At clinic · treatment";
+                case WAITING_FOR_EXIT -> "Doors open · you can leave";
+                case ON_SCENE -> "On scene · " + Math.min(kills, KILL_TARGET) + "/" + KILL_TARGET + " cleared";
                 case LEAVING -> "Leaving the scene";
             };
-            int progress = phase == Phase.ON_SCENE && service == EmergencyService.POLICE ? Math.min(100, kills * 10)
+            int progress = phase == Phase.ON_SCENE ? Math.min(100, kills * 10)
                     : Mth.clamp((int) ((1 - distance / initialDistance) * 100), 0, 100);
-            return new ModNetwork.OrderSnapshot("EMERGENCY_" + service.name(), service.label, status, distance, progress, pickup.toShortString());
+            boolean clinic = phase == Phase.RETURNING || phase == Phase.ENTERING_STATION
+                    || phase == Phase.TREATMENT || phase == Phase.WAITING_FOR_EXIT;
+            BlockPos location = clinic ? origin.offset(ServiceSitePiece.ENTRANCE) : pickup;
+            return new ModNetwork.OrderSnapshot("EMERGENCY_" + service.name(), service.label, status, distance, progress, location.toShortString());
         }
 
         void close() {
-            if (phase == Phase.LEAVING_STATION) {
+            if (usesGarage()) {
                 doors(false);
+            }
+            if (patientCart != null) {
+                patientCart.discard();
+            }
+            if (treatmentSeat != null) {
+                treatmentSeat.discard();
             }
             for (Unit unit : units) {
                 unit.responder.discard();
                 unit.cart.discard();
             }
-            arrows.forEach(Entity::discard);
+            clearArrows();
             ServiceTrip.releaseVehicleChunks(level, id, tickets);
         }
     }

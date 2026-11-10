@@ -34,6 +34,8 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSeriali
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 final class ServiceSitePiece extends StructurePiece {
     static final int HEIGHT = 12;
     static final BlockPos STOCK = new BlockPos(6, 1, 3);
@@ -44,6 +46,7 @@ final class ServiceSitePiece extends StructurePiece {
     static final BlockPos PARKING = new BlockPos(7, 1, 8);
     static final BlockPos ENTRANCE = new BlockPos(7, 1, 14);
     static final BlockPos EMERGENCY_BAY = new BlockPos(7, 1, 11);
+    static final List<BlockPos> MEDIC_CHAIRS = List.of(new BlockPos(5, 1, 8), new BlockPos(9, 1, 8));
     static final String CHEF_TAG = "intertnet_chef";
     static final String KITCHEN_TAG = "intertnet_kitchen";
     static final String SITE_POS = "IntertnetSite";
@@ -235,7 +238,7 @@ final class ServiceSitePiece extends StructurePiece {
         boolean medic = emergency == EmergencyService.MEDIC;
         Block stripe = medic ? Blocks.RED_CONCRETE : Blocks.BLUE_CONCRETE;
         fill(level, box, 2, 4, 12, 12, 4, 12, stripe);
-        fill(level, box, 7, 0, 3, 8, 0, 14, Blocks.LIGHT_GRAY_CONCRETE);
+        fill(level, box, 7, 0, 3, 8, 0, 11, Blocks.LIGHT_GRAY_CONCRETE);
         placeIronDoor(level, box, 7, 12, DoorHingeSide.LEFT);
         placeIronDoor(level, box, 8, 12, DoorHingeSide.RIGHT);
         placeWallSign(level, box, 9, 3, 13, medic ? "MEDIC STATION" : "POLICE STATION", "Free dispatch", "Call by phone");
@@ -244,6 +247,10 @@ final class ServiceSitePiece extends StructurePiece {
             hangLantern(level, box, x, 9);
         }
         if (medic) {
+            for (BlockPos chair : MEDIC_CHAIRS) {
+                placeBlock(level, Blocks.SPRUCE_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.SOUTH),
+                        chair.getX(), chair.getY(), chair.getZ(), box);
+            }
             fill(level, box, 6, 6, 10, 8, 6, 10, Blocks.RED_CONCRETE);
             fill(level, box, 7, 6, 9, 7, 6, 11, Blocks.RED_CONCRETE);
             for (int x : new int[]{4, 10}) {
@@ -268,8 +275,7 @@ final class ServiceSitePiece extends StructurePiece {
         return service == EmergencyService.MEDIC ? Blocks.SMOOTH_QUARTZ : Blocks.STONE_BRICKS;
     }
 
-    static void repairEmergencyGarage(ServerLevel level, BlockPos origin, EmergencyService service) {
-        boolean gap = false;
+    static void repairEmergencyStation(ServerLevel level, BlockPos origin, EmergencyService service) {
         Block stripe = service == EmergencyService.MEDIC ? Blocks.RED_CONCRETE : Blocks.BLUE_CONCRETE;
         for (int x : new int[]{7, 8}) {
             BlockPos door = origin.offset(x, 1, 12);
@@ -278,10 +284,24 @@ final class ServiceSitePiece extends StructurePiece {
                     || !level.getBlockState(door.above(3)).is(stripe)) {
                 return;
             }
-            gap |= level.getBlockState(door.above(2)).isAir();
         }
-        if (gap) {
-            setEmergencyGarage(level, origin, service, false);
+        setEmergencyGarage(level, origin, service, false);
+        for (int x = 7; x <= 8; x++) {
+            for (int z = 12; z <= 14; z++) {
+                BlockPos paving = origin.offset(x, 0, z);
+                if (level.getBlockState(paving).is(Blocks.LIGHT_GRAY_CONCRETE)) {
+                    level.setBlockAndUpdate(paving, Blocks.POLISHED_ANDESITE.defaultBlockState());
+                }
+            }
+        }
+        if (service == EmergencyService.MEDIC) {
+            BlockState stair = Blocks.SPRUCE_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
+            for (BlockPos offset : MEDIC_CHAIRS) {
+                BlockPos chair = origin.offset(offset);
+                if (level.getBlockState(chair).isAir()) {
+                    level.setBlockAndUpdate(chair, stair);
+                }
+            }
         }
     }
 

@@ -207,7 +207,7 @@ final class TownServices {
         if (event.getHand() == InteractionHand.MAIN_HAND && !player.isShiftKeyDown()
                 && level.getBlockState(pos).is(Blocks.SPRUCE_STAIRS)) {
             var seats = level.getEntities(IntertnetMod.DINING_SEAT.get(), new AABB(pos),
-                    seat -> seat.isAlive() && seat.blockPosition().equals(pos));
+                    seat -> seat.isAlive() && seat.blockPosition().equals(pos) && !EmergencyDispatch.isTreatmentSeat(seat));
             if (!seats.isEmpty()) {
                 DiningSeat seat = seats.getFirst();
                 if (!seat.isVehicle()) {

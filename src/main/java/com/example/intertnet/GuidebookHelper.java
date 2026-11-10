@@ -70,7 +70,7 @@ public class GuidebookHelper {
 
                 page(Component.literal("10. Call Medics\n")
                         .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                        .append(Component.literal("\nOpen SOS with cell or satellite reception. Calling is free.\n\nMedics drive from their station and shoot healing arrows. Stay in view until you're treated.").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal("\nOpen SOS with cell or satellite reception. Calling is free.\n\nBoard the ambulance's rear cart. At the clinic, medics seat you and use healing arrows. The doors open when treatment ends.").withStyle(ChatFormatting.BLACK))),
 
                 page(Component.literal("11. Call Police\n")
                         .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
