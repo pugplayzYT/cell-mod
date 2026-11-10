@@ -109,7 +109,11 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
         g.renderOutline(x + 2, y + 2, this.imageWidth - 4, this.imageHeight - 4, 0xFF2D3748);
 
         g.fill(x + 4, y + 4, x + this.imageWidth - 4, y + 24, 0xFF0F172A);
-        boolean powered = this.menu.getFuelRemaining() > 0;
+        var level = Minecraft.getInstance().level;
+        boolean skyBlocked = this.menu.isSatelliteConnector() && level != null
+                && level.getBlockEntity(this.menu.getTowerPos()) instanceof CellTowerBlockEntity tower
+                && !tower.hasSatelliteSkyAccess();
+        boolean powered = this.menu.getFuelRemaining() > 0 && !skyBlocked;
         ResourceLocation sigTex = powered ? SIG_4 : SIG_0;
         g.blit(sigTex, x + this.imageWidth - 54, y + 5, 0, 0, 46, 17, 46, 17);
 
@@ -125,7 +129,7 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
 
             int fuelRem = this.menu.getFuelRemaining();
             int fuelMax = Math.max(1, this.menu.getFuelMax());
-            float ratio = powered ? Mth.clamp((float) fuelRem / (float) fuelMax, 0f, 1f) : 0f;
+            float ratio = Mth.clamp((float) fuelRem / (float) fuelMax, 0f, 1f);
 
             int barX = x + 54;
             int barY = y + 54;
@@ -134,12 +138,12 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
             g.fill(barX, barY, barX + barW, barY + barH, 0xFF090D16);
             int fillW = (int) (barW * ratio);
             if (fillW > 0) {
-                g.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, 0xFF10B981);
+                g.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, skyBlocked ? 0xFFF59E0B : 0xFF10B981);
             }
             g.renderOutline(barX, barY, barW, barH, 0xFF475569);
 
             boolean isSat = this.menu.isSatelliteConnector();
-            String statusText = powered
+            String statusText = skyBlocked ? "OFFLINE (Sky Blocked)" : powered
                     ? "ONLINE (" + this.menu.getActiveRange() + "m Range)"
                     : "OFFLINE (" + (isSat ? "Insert Copper" : "No Fuel") + ")";
             int statusCol = powered ? 0xFF34D399 : 0xFFF87171;
@@ -149,7 +153,7 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
 
             g.drawString(this.font, isSat ? "Cu" : "Fuel", x + 23, y + 36, 0xFF94A3B8, false);
             g.drawString(this.font, statusText, barX, y + 32, statusCol, false);
-            g.drawString(this.font, "Reserve: " + fuelRem + " / " + (powered ? fuelMax : 0) + "u", barX, y + 43, 0xFFCBD5E1, false);
+            g.drawString(this.font, "Reserve: " + fuelRem + " / " + (fuelRem > 0 ? fuelMax : 0) + "u", barX, y + 43, 0xFFCBD5E1, false);
             String fuelHint = isSat
                     ? "Copper Only • Portable 64m"
                     : "Au:96m Em:128m Dia:192m Net:256m";
@@ -162,7 +166,6 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
             g.renderOutline(x + 12, y + 28, this.imageWidth - 24, 60, 0xFF10B981);
             g.drawString(this.font, "Towers in Radius (Click to Link):", x + 16, y + 32, 0xFF34D399, false);
 
-            var level = Minecraft.getInstance().level;
             List<CellTowerBlockEntity> nearby = level != null
                     ? TowerNetworkManager.getTowersInRadius(level, this.menu.getTowerPos())
                     : List.of();

@@ -128,6 +128,9 @@ public class PhoneScreen extends Screen {
         } else if (simNet == null) {
             sigLabel = "NO SIM CARD";
             sigColor = 0xFFFBBF24;
+        } else if (sig.satelliteSkyBlockedNearby()) {
+            sigLabel = "SATELLITE SKY BLOCKED";
+            sigColor = 0xFFF97316;
         } else if (sig.missingOrWrongSim()) {
             sigLabel = "WRONG SIM NET";
             sigColor = 0xFFEF4444;
@@ -146,6 +149,8 @@ public class PhoneScreen extends Screen {
             subLine = String.format(Locale.ROOT, "%dm · %ddBm", (int) sig.rawDistance(), sig.getSignalDbm());
         } else if (simNet == null) {
             subLine = "Buy or print a SIM";
+        } else if (sig.satelliteSkyBlockedNearby()) {
+            subLine = "Max " + SatelliteConnectorBlock.MAX_SKY_OBSTRUCTIONS + " blocks above";
         } else {
             subLine = "Find a matching tower";
         }

@@ -125,6 +125,7 @@ public class CellTowerDebugRenderer {
         } else {
             event.getLeft().add("Cellular Status: §cNO SIGNAL§r"
                     + (simNet == null ? " §e(No SIM Card Inserted)§r" : (sig.missingOrWrongSim() ? " §c(SIM Network Mismatch)§r" : ""))
+                    + (sig.satelliteSkyBlockedNearby() ? " §6(Satellite Sky Blocked)§r" : "")
                     + (sig.unpoweredTowerNearby() ? " §6(Nearby Tower Out of Fuel)§r" : ""));
         }
     }

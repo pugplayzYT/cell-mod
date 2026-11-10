@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 
 public class SatelliteConnectorBlock extends CellTowerBlock {
+    static final int MAX_SKY_OBSTRUCTIONS = 6;
 
     public SatelliteConnectorBlock(Properties properties) {
         super(properties);
@@ -46,6 +47,7 @@ public class SatelliteConnectorBlock extends CellTowerBlock {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
         tooltipComponents.add(Component.literal("Portable 64m Internet on the Go").withStyle(ChatFormatting.AQUA));
         tooltipComponents.add(Component.literal("• Supports phone apps and SOS calls").withStyle(ChatFormatting.GRAY));
+        tooltipComponents.add(Component.literal("• Sky access: up to " + MAX_SKY_OBSTRUCTIONS + " overhead blocks").withStyle(ChatFormatting.GRAY));
         tooltipComponents.add(Component.literal("• Fuel: Copper Ingots / Copper Blocks only").withStyle(ChatFormatting.GOLD));
         tooltipComponents.add(Component.literal("• Includes 1 Free SIM Card (extra SIMs cost Paper + Gold)").withStyle(ChatFormatting.GREEN));
     }

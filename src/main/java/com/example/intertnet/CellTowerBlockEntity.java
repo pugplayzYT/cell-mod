@@ -24,6 +24,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -48,6 +49,8 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     private boolean freeSimClaimed = false;
     private final Set<BlockPos> wirelessLinks = new LinkedHashSet<>();
     private int passiveTickCounter = 0;
+    private long lastSkyCheckTick = Long.MIN_VALUE;
+    private boolean satelliteSkyAccess;
 
     public final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -213,6 +216,12 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
         }
 
         boolean isSat = be.isSatelliteConnector();
+        if (isSat && !be.hasSatelliteSkyAccess()) {
+            if (state.getValue(CellTowerBlock.POWERED)) {
+                level.setBlock(pos, state.setValue(CellTowerBlock.POWERED, false), Block.UPDATE_ALL);
+            }
+            return;
+        }
         boolean changed = false;
         ItemStack slotStack = be.items.get(0);
         FuelSpec slotSpec = getFuelSpec(slotStack, isSat);
@@ -288,7 +297,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
         if (isPublicTower()) {
             return true;
         }
-        if (this.fuelRemaining <= 0) {
+        if (!isPowered()) {
             return false;
         }
         boolean isSat = isSatelliteConnector();
@@ -320,7 +329,38 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     }
 
     public boolean isPowered() {
-        return this.fuelRemaining > 0;
+        return this.fuelRemaining > 0 && (!isSatelliteConnector() || hasSatelliteSkyAccess());
+    }
+
+    boolean hasSatelliteSkyAccess() {
+        Level level = this.level;
+        if (level == null) {
+            return false;
+        }
+        long tick = level.getGameTime();
+        if (this.lastSkyCheckTick != tick) {
+            this.satelliteSkyAccess = checkSkyColumn(level);
+            this.lastSkyCheckTick = tick;
+        }
+        return this.satelliteSkyAccess;
+    }
+
+    private boolean checkSkyColumn(Level level) {
+        int x = this.worldPosition.getX();
+        int z = this.worldPosition.getZ();
+        int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+        BlockPos.MutableBlockPos above = this.worldPosition.mutable();
+        int obstructions = 0;
+        for (int y = this.worldPosition.getY() + 1; y < surface; y++) {
+            above.setY(y);
+            BlockState state = level.getBlockState(above);
+            if (!state.getFluidState().isEmpty() || !state.getCollisionShape(level, above).isEmpty()) {
+                if (++obstructions > SatelliteConnectorBlock.MAX_SKY_OBSTRUCTIONS) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     public int getFuelRemaining() {
@@ -332,7 +372,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     }
 
     public int getActiveRange() {
-        if (this.fuelRemaining <= 0) return 0;
+        if (!isPowered()) return 0;
         return isSatelliteConnector() ? 64 : this.activeRange;
     }
 

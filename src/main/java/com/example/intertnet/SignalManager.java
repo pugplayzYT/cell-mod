@@ -40,6 +40,7 @@ public class SignalManager {
             int occludingBlocks,
             boolean missingOrWrongSim,
             boolean unpoweredTowerNearby,
+            boolean satelliteSkyBlockedNearby,
             boolean connectedViaSatellite
     ) {
         public int getDeliveryTicks() {
@@ -146,11 +147,16 @@ public class SignalManager {
         TowerSignalEval best = null;
         boolean missingOrWrongSim = false;
         boolean unpoweredNearby = false;
+        boolean skyBlockedNearby = false;
 
         for (CellTowerBlockEntity tower : towers) {
             TowerSignalEval eval = evaluateTower(level, eyePos, tower, simNetwork);
             if (!eval.powered() && eval.rawDistance() <= eval.maxRange()) {
-                unpoweredNearby = true;
+                if (tower.isSatelliteConnector() && !tower.hasSatelliteSkyAccess()) {
+                    skyBlockedNearby |= eval.simMatches();
+                } else {
+                    unpoweredNearby = true;
+                }
             }
             if (eval.powered() && !eval.simMatches() && eval.effectiveDistance() <= eval.maxRange()) {
                 missingOrWrongSim = true;
@@ -173,10 +179,11 @@ public class SignalManager {
                     best.occludingBlocks(),
                     false,
                     false,
+                    false,
                     best.tower().isSatelliteConnector()
             );
         }
 
-        return new SignalStatus(0, null, 0.0, 0.0, 0, 0, missingOrWrongSim, unpoweredNearby, false);
+        return new SignalStatus(0, null, 0.0, 0.0, 0, 0, missingOrWrongSim, unpoweredNearby, skyBlockedNearby, false);
     }
 }
