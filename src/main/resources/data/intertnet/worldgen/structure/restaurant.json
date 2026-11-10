@@ -1,0 +1,8 @@
+{
+  "type": "intertnet:service_site",
+  "restaurant": true,
+  "biomes": "#intertnet:has_structure/service_site",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

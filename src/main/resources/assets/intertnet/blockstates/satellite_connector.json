@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "intertnet:block/satellite_connector_off"
+    },
+    "powered=true": {
+      "model": "intertnet:block/satellite_connector"
+    }
+  }
+}

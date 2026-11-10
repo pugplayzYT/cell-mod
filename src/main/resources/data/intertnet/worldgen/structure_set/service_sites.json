@@ -1,0 +1,17 @@
+{
+  "structures": [
+    { "structure": "intertnet:restaurant", "weight": 3 },
+    { "structure": "intertnet:rideshare_center", "weight": 2 }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 21,
+    "separation": 11,
+    "salt": 57102963,
+    "locate_offset": [7, 0, 14],
+    "exclusion_zone": {
+      "other_set": "minecraft:villages",
+      "chunk_count": 4
+    }
+  }
+}

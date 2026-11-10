@@ -1,0 +1,10 @@
+{
+  "itemGroup.intertnet": "Intertnet Cellular",
+  "item.intertnet.phone": "Cellular Phone",
+  "item.intertnet.sim_card": "SIM Card",
+  "block.intertnet.cell_tower": "Cell Tower",
+  "block.intertnet.satellite_connector": "Portable Satellite Connector",
+  "gui.intertnet.cell_tower.title": "Cell Tower Infrastructure",
+  "gui.intertnet.satellite_connector.title": "Portable Satellite Connector",
+  "gui.intertnet.phone.title": "Intertnet OS"
+}

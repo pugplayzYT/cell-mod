@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "intertnet:block/cell_tower_top",
+    "side": "intertnet:block/cell_tower_side"
+  }
+}

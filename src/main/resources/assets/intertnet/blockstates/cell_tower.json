@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=true": {
+      "model": "intertnet:block/cell_tower"
+    },
+    "powered=false": {
+      "model": "intertnet:block/cell_tower_off"
+    }
+  }
+}

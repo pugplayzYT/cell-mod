@@ -1,0 +1,7 @@
+{
+  "type": "intertnet:public_cell_tower",
+  "biomes": "#intertnet:has_structure/public_cell_tower",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

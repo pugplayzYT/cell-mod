@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "CRC",
+    "C#C"
+  ],
+  "key": {
+    "C": {
+      "item": "minecraft:copper_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "#": {
+      "item": "minecraft:cobblestone"
+    }
+  },
+  "result": {
+    "id": "intertnet:satellite_connector",
+    "count": 1
+  }
+}
