@@ -13,8 +13,10 @@ import net.minecraft.tags.StructureTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.vehicle.MinecartChest;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -131,6 +133,7 @@ final class TownServices {
     static void register() {
         NeoForge.EVENT_BUS.addListener(TownServices::onTick);
         NeoForge.EVENT_BUS.addListener(TownServices::onInteract);
+        NeoForge.EVENT_BUS.addListener(TownServices::onRideInteractAt);
         NeoForge.EVENT_BUS.addListener(TownServices::onKitchenUse);
         NeoForge.EVENT_BUS.addListener(TownServices::onKitchenBreak);
         NeoForge.EVENT_BUS.addListener(TownServices::onKitchenExplosion);
@@ -147,16 +150,16 @@ final class TownServices {
         }
         var target = event.getTarget();
         if (target.getTags().contains(ServiceTrip.VEHICLE_TAG)) {
-            Slot slot = target instanceof net.minecraft.world.entity.vehicle.MinecartChest ? Slot.FOOD : Slot.RIDE;
-            Job job = jobs.get(new JobKey(player.getUUID(), slot));
-            if (job == null || job.stage != Stage.TRAVELLING || !job.trip.allowsInteraction(target)) {
-                event.setCancellationResult(InteractionResult.CONSUME);
-                event.setCanceled(true);
-            } else if (job.mode == Mode.DELIVERY) {
-                event.setCancellationResult(InteractionResult.CONSUME);
-                event.setCanceled(true);
-                if (event.getHand() == InteractionHand.MAIN_HAND) {
-                    job.trip.openDeliveryChest(player);
+            event.setCancellationResult(InteractionResult.CONSUME);
+            event.setCanceled(true);
+            if (event.getHand() == InteractionHand.MAIN_HAND) {
+                if (target instanceof MinecartChest) {
+                    Job job = jobs.get(new JobKey(player.getUUID(), Slot.FOOD));
+                    if (job != null && job.stage == Stage.TRAVELLING && job.trip.allowsInteraction(target)) {
+                        job.trip.openDeliveryChest(player);
+                    }
+                } else {
+                    boardRide(player, target);
                 }
             }
         } else if (target instanceof Villager chef && chef.getTags().contains(ServiceSitePiece.CHEF_TAG)) {
@@ -165,6 +168,25 @@ final class TownServices {
             if (event.getHand() == InteractionHand.MAIN_HAND) {
                 PacketDistributor.sendToPlayer(player, new ModNetwork.ServiceMenuPayload(chef.getId()));
             }
+        }
+    }
+
+    private static void onRideInteractAt(PlayerInteractEvent.EntityInteractSpecific event) {
+        Entity target = event.getTarget();
+        if (event.getEntity() instanceof ServerPlayer player
+                && !(target instanceof MinecartChest) && target.getTags().contains(ServiceTrip.VEHICLE_TAG)) {
+            event.setCancellationResult(InteractionResult.CONSUME);
+            event.setCanceled(true);
+            if (event.getHand() == InteractionHand.MAIN_HAND) {
+                boardRide(player, target);
+            }
+        }
+    }
+
+    private static void boardRide(ServerPlayer player, Entity target) {
+        Job job = jobs.get(new JobKey(player.getUUID(), Slot.RIDE));
+        if (job != null && job.stage == Stage.TRAVELLING && job.trip.allowsInteraction(target)) {
+            job.trip.board(player);
         }
     }
 

@@ -171,7 +171,8 @@ final class ServiceTrip {
         }
         BlockPos stop = phase == Phase.DESTINATION ? destination : pickup;
         Vec3 target = Vec3.atBottomCenterOf(stop);
-        if (horizontalDistance(position, target) > 2.8) {
+        double stoppingDistance = phase == Phase.PICKUP && !delivery ? 1.25 : 2.8;
+        if (horizontalDistance(position, target) > stoppingDistance) {
             advance(target, false);
             return Result.ACTIVE;
         }
@@ -185,11 +186,28 @@ final class ServiceTrip {
             return Result.COMPLETED;
         }
         phase = delivery ? Phase.COLLECTION : Phase.BOARDING;
+        if (!delivery) {
+            parkPassengerCart();
+        }
         waitUntil = level.getGameTime() + 20 * 120;
         owner.displayClientMessage(Component.literal(delivery
                 ? "Delivery arrived. Open the chest cart to collect your meal."
                 : "Your ride is here. Right-click the rear cart to board."), false);
         return Result.ACTIVE;
+    }
+
+    private void parkPassengerCart() {
+        Vec3 rear = position.subtract(forward.scale(CART_GAP));
+        BlockPos near = BlockPos.containing(rear.x, pickup.getY(), rear.z);
+        BlockPos stand = safeSurface(level, near, 2, 1);
+        if (stand == null) {
+            stand = safeSurface(level, pickup, 2, 1);
+        }
+        if (stand != null) {
+            DeliveryManager.positionCart(level, passengerCart, Vec3.atBottomCenterOf(stand), front.getYRot());
+        }
+        front.setDeltaMovement(Vec3.ZERO);
+        passengerCart.setDeltaMovement(Vec3.ZERO);
     }
 
     private void findMansionDropoff() {
@@ -291,6 +309,17 @@ final class ServiceTrip {
     boolean allowsInteraction(Entity entity) {
         return delivery ? entity == front && phase == Phase.COLLECTION
                 : entity == passengerCart && phase == Phase.BOARDING;
+    }
+
+    void board(ServerPlayer player) {
+        if (passengerCart.hasPassenger(player)) {
+            return;
+        }
+        if (player.isShiftKeyDown()) {
+            player.displayClientMessage(Component.literal("Release sneak, then right-click the rideshare seat."), true);
+        } else if (passengerCart.isVehicle() || !player.startRiding(passengerCart, true)) {
+            player.displayClientMessage(Component.literal("Couldn't board the rideshare seat. Try again."), true);
+        }
     }
 
     boolean usesStation() {
