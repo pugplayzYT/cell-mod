@@ -44,7 +44,9 @@ public class ClientPhoneState {
     static SignalManager.SignalStatus getSignal(Player player, @Nullable String sim) {
         var snapshot = signal;
         return snapshot != null && snapshot.dimension().equals(player.level().dimension().location())
-                && Objects.equals(snapshot.sim(), sim) ? snapshot.status() : null;
+                && Objects.equals(snapshot.sim(), sim)
+                && snapshot.antenna() == PhoneItem.hasSatelliteAntenna(DeliveryManager.findPlayerPhoneStack(player))
+                ? snapshot.status() : null;
     }
 
     public static List<ModNetwork.OrderSnapshot> getActiveOrders() {

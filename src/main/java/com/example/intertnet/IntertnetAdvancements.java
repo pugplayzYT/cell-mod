@@ -23,15 +23,17 @@ final class IntertnetAdvancements {
 
     static void checkConnection(ServerPlayer player, SignalManager.SignalStatus signal) {
         award(player, CONNECTED);
-        BlockEntity source = player.serverLevel().getBlockEntity(signal.connectedTowerPos());
-        if (source instanceof CellTowerBlockEntity tower && !tower.isPublicTower() && !tower.isSatelliteConnector()) {
-            award(player, PRIVATE_NETWORK);
-        } else if (signal.connectedViaSatellite()) {
+        if (signal.connectedViaSatellite()) {
             var advancement = player.server.getAdvancements().get(
                     ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, OFF_THE_GRID));
             if (advancement != null && !player.getAdvancements().getOrStartProgress(advancement).isDone()
                     && !SignalManager.hasCellCoverage(player)) {
                 player.getAdvancements().award(advancement, "completed");
+            }
+        } else {
+            BlockEntity source = player.serverLevel().getBlockEntity(signal.connectedTowerPos());
+            if (source instanceof CellTowerBlockEntity tower && !tower.isPublicTower()) {
+                award(player, PRIVATE_NETWORK);
             }
         }
     }

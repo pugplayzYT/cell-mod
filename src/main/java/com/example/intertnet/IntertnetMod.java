@@ -75,6 +75,9 @@ public class IntertnetMod {
                     .persistent(Codec.STRING)
                     .networkSynchronized(ByteBufCodecs.STRING_UTF8)
                     .build());
+    static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> PHONE_SATELLITE_ANTENNA =
+            DATA_COMPONENTS.register("phone_satellite_antenna", () -> DataComponentType.<Boolean>builder()
+                    .persistent(Codec.BOOL).networkSynchronized(ByteBufCodecs.BOOL).build());
 
     public static final DeferredBlock<Block> CELL_TOWER_BLOCK = BLOCKS.register("cell_tower",
             () -> new CellTowerBlock(BlockBehaviour.Properties.of()
@@ -97,6 +100,11 @@ public class IntertnetMod {
                     .lightLevel(state -> state.getValue(CellTowerBlock.POWERED) ? 7 : 0)));
 
     public static final DeferredItem<BlockItem> SATELLITE_CONNECTOR_ITEM = ITEMS.registerSimpleBlockItem("satellite_connector", SATELLITE_CONNECTOR_BLOCK);
+    static final DeferredBlock<Block> SATELLITE_RELAY = BLOCKS.register("satellite_relay",
+            () -> new GlobalSatelliteNetwork.RelayBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL).strength(3.5f, 6.0f).sound(SoundType.METAL).lightLevel(state -> 9)));
+    static final DeferredItem<Item> PERSONAL_SATELLITE_ANTENNA = ITEMS.register("personal_satellite_antenna",
+            PersonalSatelliteAntennaItem::new);
 
     public static final DeferredItem<Item> PHONE_ITEM = ITEMS.register("phone",
             () -> new PhoneItem(new Item.Properties().stacksTo(1)));
@@ -121,6 +129,7 @@ public class IntertnetMod {
                         output.accept(new ItemStack(PHONE_ITEM.get()));
                         output.accept(new ItemStack(SIM_CARD_ITEM.get()));
                         output.accept(SATELLITE_CONNECTOR_ITEM.get());
+                        output.accept(PERSONAL_SATELLITE_ANTENNA.get());
                         output.accept(CELL_TOWER_ITEM.get());
                         output.accept(LOW_ANTENNA.get());
                         output.accept(MEDIUM_ANTENNA.get());
@@ -149,6 +158,7 @@ public class IntertnetMod {
         NeoForge.EVENT_BUS.addListener(this::onServerAboutToStart);
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
         NeoForge.EVENT_BUS.addListener(TowerChunkLoading::tick);
+        NeoForge.EVENT_BUS.addListener(GlobalSatelliteNetwork::tick);
         NeoForge.EVENT_BUS.addListener(DeliveryManager::onServerTick);
         TownServices.register();
         TowerGuards.register();
@@ -222,10 +232,14 @@ public class IntertnetMod {
 
     private void onEntityInteract(final PlayerInteractEvent.EntityInteract event) {
         if (!event.getLevel().isClientSide && event.getTarget() instanceof AbstractVillager trader
-                && !trader.isTrading() && !trader.getTags().contains(PublicTowerPiece.VENDOR_TAG)) {
-            // Old saves can still contain the original offers.
-            trader.getOffers().removeIf(offer -> offer.getResult().is(PHONE_ITEM.get())
-                    || offer.getResult().is(SIM_CARD_ITEM.get()));
+                && !trader.isTrading()) {
+            if (trader.getTags().contains(PublicTowerPiece.VENDOR_TAG)) {
+                PublicTowerPiece.ensureSatelliteOffer(trader.getOffers());
+            } else {
+                // Old saves can still contain the original offers.
+                trader.getOffers().removeIf(offer -> offer.getResult().is(PHONE_ITEM.get())
+                        || offer.getResult().is(SIM_CARD_ITEM.get()));
+            }
         }
     }
 

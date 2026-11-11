@@ -18,11 +18,13 @@ public class PhoneHudOverlay {
         }
 
         // Check if the player has a Phone anywhere in their inventory or hands
-        if (!DeliveryManager.hasAnyPhoneInInventory(player)) {
+        var phone = DeliveryManager.findPlayerPhoneStack(player);
+        if (phone.isEmpty()) {
             return;
         }
 
-        String simNet = DeliveryManager.findPlayerSimNetwork(player);
+        String simNet = PhoneItem.getInsertedSimNetwork(phone);
+        boolean hasAntenna = PhoneItem.hasSatelliteAntenna(phone);
         GuiGraphics g = event.getGuiGraphics();
         SignalManager.SignalStatus sig = SignalManager.getBestSignal(player, simNet);
         int bars = Mth.clamp(sig.bars(), 0, 4);
@@ -45,10 +47,12 @@ public class PhoneHudOverlay {
 
         String topText;
         if (bars > 0) {
-            topText = bars + "/4 Bars";
-        } else if (simNet == null) {
+            topText = sig.connectedViaGlobalSatellite() ? "Sat " + bars + "/4 Bars" : bars + "/4 Bars";
+        } else if (sig.satelliteSkyBlockedNearby()) {
+            topText = "Sky Blocked";
+        } else if (simNet == null && !hasAntenna) {
             topText = "No SIM";
-        } else if (sig.missingOrWrongSim()) {
+        } else if (simNet != null && sig.missingOrWrongSim()) {
             topText = "Wrong SIM";
         } else {
             topText = "No Signal";
@@ -65,7 +69,7 @@ public class PhoneHudOverlay {
 
         String subText = bars > 0
                 ? ((int) sig.rawDistance() + "m • " + sig.getSignalDbm() + "dBm")
-                : (simNet != null ? simNet : "Insert SIM");
+                : (simNet != null ? simNet : hasAntenna ? "Satellite" : "Insert SIM");
         g.drawString(mc.font, mc.font.plainSubstrByWidth(subText, 68), boxX + 47, boxY + 12, 0xFF94A3B8, false);
 
         if (hasOrders) {

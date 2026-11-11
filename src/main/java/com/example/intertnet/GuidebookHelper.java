@@ -80,7 +80,11 @@ public class GuidebookHelper {
 
                 page(Component.literal("13. Rideshare\n")
                         .withStyle(ChatFormatting.DARK_BLUE, ChatFormatting.BOLD)
-                        .append(Component.literal("\nChoose a destination in the Rideshare app. Fares go up with distance.\n\nWait at your pickup spot and right-click the rear cart to board.").withStyle(ChatFormatting.BLACK)))
+                        .append(Component.literal("\nChoose a destination in the Rideshare app. Fares go up with distance.\n\nWait at your pickup spot and right-click the rear cart to board.").withStyle(ChatFormatting.BLACK))),
+
+                page(Component.literal("14. Global Satellite\n")
+                        .withStyle(ChatFormatting.DARK_AQUA, ChatFormatting.BOLD)
+                        .append(Component.literal("\nBuy a phone antenna at an Open World stall for 20 emeralds. It has its own SIM.\n\nYour phone falls back to satellite in the Overworld with up to six blocks overhead.").withStyle(ChatFormatting.BLACK)))
         );
 
         WrittenBookContent content = new WrittenBookContent(

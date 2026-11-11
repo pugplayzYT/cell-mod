@@ -34,6 +34,10 @@ public class PhoneItem extends Item {
         }
     }
 
+    static boolean hasSatelliteAntenna(ItemStack stack) {
+        return stack.getOrDefault(IntertnetMod.PHONE_SATELLITE_ANTENNA.get(), false);
+    }
+
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         ItemStack stack = player.getItemInHand(usedHand);
@@ -52,6 +56,9 @@ public class PhoneItem extends Item {
         } else {
             tooltipComponents.add(Component.literal("SIM Card: ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("None (Insert a Tower SIM)").withStyle(ChatFormatting.RED)));
+        }
+        if (hasSatelliteAntenna(stack)) {
+            tooltipComponents.add(Component.literal("Global Satellite antenna installed").withStyle(ChatFormatting.AQUA));
         }
         tooltipComponents.add(Component.literal("Right-click to open Intertnet OS").withStyle(ChatFormatting.AQUA));
     }

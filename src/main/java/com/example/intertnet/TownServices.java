@@ -265,7 +265,8 @@ final class TownServices {
         String sim = DeliveryManager.findPlayerSimNetwork(player);
         var signal = SignalManager.getBestSignal(player, sim);
         if (signal.bars() <= 0) {
-            String message = sim == null ? "Insert a SIM to connect." : "No reception. Move into tower range.";
+            String message = signal.satelliteSkyBlockedNearby() ? "No reception. Move somewhere with clear sky."
+                    : "No phone reception.";
             if (quoteOnly) {
                 sendQuotes(player, mode, 0, List.of(), message);
             } else {

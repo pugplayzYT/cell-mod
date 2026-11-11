@@ -68,36 +68,31 @@ public class DeliveryManager {
         return Mth.lerp(0.15, currentY, fallbackTargetY);
     }
 
-    public static void postNetworkMessage(ServerPlayer sender, String senderSimNet, String messageText) {
+    public static void postNetworkMessage(ServerPlayer sender, String messageText) {
         String cleanText = messageText == null ? "" : messageText.trim();
         if (cleanText.isEmpty()) return;
         if (cleanText.length() > 140) {
             cleanText = cleanText.substring(0, 140);
         }
 
-        SignalManager.SignalStatus senderSig = SignalManager.getBestSignal(sender, senderSimNet);
-        if (senderSig.bars() <= 0 || senderSig.connectedTowerPos() == null) {
-            sender.displayClientMessage(Component.literal("Cannot send message: No cellular signal!").withStyle(ChatFormatting.RED), true);
+        ModNetwork.PhoneSignal senderSignal = phoneSignal(sender);
+        if (!isConnected(senderSignal)) {
+            sender.displayClientMessage(Component.literal("Cannot send message without phone reception.").withStyle(ChatFormatting.RED), true);
             return;
         }
 
         MessageSavedData.get(sender.server.overworld()).addMessage(
-                new ChatMessage(sender.getScoreboardName(), senderSimNet, cleanText, System.currentTimeMillis())
+                new ChatMessage(sender.getScoreboardName(), carrier(senderSignal), cleanText, System.currentTimeMillis())
         );
 
         boolean delivered = false;
         // Deliver globally to every player who has signal on any cellular carrier.
         for (ServerPlayer peer : sender.server.getPlayerList().getPlayers()) {
-            String peerSim = findPlayerSimNetwork(peer);
-            if (peerSim == null) continue;
-            SignalManager.SignalStatus peerSig = SignalManager.getBestSignal(peer, peerSim);
-            if (peerSig.bars() > 0 && peerSig.connectedTowerPos() != null) {
-                if (peer != sender) {
-                    delivered = true;
-                    peer.displayClientMessage(Component.literal("💬 [" + sender.getScoreboardName() + "]: " + cleanText)
-                            .withStyle(ChatFormatting.AQUA), true);
-                    peer.level().playSound(null, peer.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6f, 1.6f);
-                }
+            if (peer != sender && isConnected(phoneSignal(peer))) {
+                delivered = true;
+                peer.displayClientMessage(Component.literal("💬 [" + sender.getScoreboardName() + "]: " + cleanText)
+                        .withStyle(ChatFormatting.AQUA), true);
+                peer.level().playSound(null, peer.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6f, 1.6f);
                 syncToPlayer(peer);
             }
         }
@@ -130,10 +125,6 @@ public class DeliveryManager {
         return PhoneItem.getInsertedSimNetwork(phone);
     }
 
-    public static boolean hasAnyPhoneInInventory(Player player) {
-        return !findPlayerPhoneStack(player).isEmpty();
-    }
-
     public static void syncToPlayer(ServerPlayer player) {
         ModNetwork.PhoneSignal signal = phoneSignal(player);
         List<String> peers = new ArrayList<>();
@@ -148,9 +139,11 @@ public class DeliveryManager {
 
     @Nullable
     private static ModNetwork.PhoneSignal phoneSignal(ServerPlayer player) {
-        String simNet = findPlayerSimNetwork(player);
-        return simNet == null ? null : new ModNetwork.PhoneSignal(player.level().dimension().location(), simNet,
-                SignalManager.getBestSignal(player, simNet));
+        ItemStack phone = findPlayerPhoneStack(player);
+        String simNet = PhoneItem.getInsertedSimNetwork(phone);
+        boolean antenna = PhoneItem.hasSatelliteAntenna(phone);
+        return simNet == null && !antenna ? null : new ModNetwork.PhoneSignal(player.level().dimension().location(),
+                simNet, antenna, SignalManager.getBestSignal(player, simNet));
     }
 
     private static boolean isConnected(@Nullable ModNetwork.PhoneSignal signal) {
@@ -158,7 +151,11 @@ public class DeliveryManager {
     }
 
     private static String peerLabel(ServerPlayer player, ModNetwork.PhoneSignal signal) {
-        return player.getScoreboardName() + " [" + signal.sim() + "]";
+        return player.getScoreboardName() + " [" + carrier(signal) + "]";
+    }
+
+    private static String carrier(ModNetwork.PhoneSignal signal) {
+        return signal.status().connectedViaGlobalSatellite() ? GlobalSatelliteNetwork.NAME : signal.sim();
     }
 
     private static void syncToPlayer(ServerPlayer player, @Nullable ModNetwork.PhoneSignal signal, List<String> peers) {
@@ -172,7 +169,8 @@ public class DeliveryManager {
 
         if (isConnected(signal)) {
             var status = signal.status();
-            currentNetLabel = TowerNetworkManager.getNetworkId(player.level(), status.connectedTowerPos());
+            currentNetLabel = status.connectedViaGlobalSatellite() ? GlobalSatelliteNetwork.NAME
+                    : TowerNetworkManager.getNetworkId(player.level(), status.connectedTowerPos());
             IntertnetAdvancements.checkConnection(player, status);
             peersOnNetwork = peers;
             for (ChatMessage m : MessageSavedData.get(player.server.overworld()).getMessagesSnapshot()) {

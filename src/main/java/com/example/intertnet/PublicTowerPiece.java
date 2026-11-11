@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.WorldGenLevel;
@@ -30,6 +31,7 @@ final class PublicTowerPiece extends StructurePiece {
     static final String VENDOR_TAG = "intertnet_public_network_vendor";
     private static final int PHONE_PRICE = 2;
     private static final int SIM_PRICE = 5;
+    private static final int SATELLITE_ANTENNA_PRICE = 20;
 
     private boolean vendorSpawned;
 
@@ -151,7 +153,7 @@ final class PublicTowerPiece extends StructurePiece {
                     .setMessage(0, Component.literal("OPEN WORLD"))
                     .setMessage(1, Component.literal("Get your SIM!"))
                     .setMessage(2, Component.literal("Phone " + PHONE_PRICE + " / SIM " + SIM_PRICE))
-                    .setMessage(3, Component.literal("In emeralds"));
+                    .setMessage(3, Component.literal("Sat Antenna " + SATELLITE_ANTENNA_PRICE));
             ServiceSitePiece.writeSign(level, sign, text);
         }
     }
@@ -179,7 +181,16 @@ final class PublicTowerPiece extends StructurePiece {
                 Integer.MAX_VALUE, 0, 0.0F));
         offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, SIM_PRICE), SimCardItem.createForNetwork(TowerNetworkManager.PUBLIC_NETWORK),
                 Integer.MAX_VALUE, 0, 0.0F));
+        ensureSatelliteOffer(offers);
         level.addFreshEntityWithPassengers(vendor);
         this.vendorSpawned = true;
+    }
+
+    static void ensureSatelliteOffer(MerchantOffers offers) {
+        var antenna = IntertnetMod.PERSONAL_SATELLITE_ANTENNA.get();
+        if (offers.stream().noneMatch(offer -> offer.getResult().is(antenna))) {
+            offers.add(new MerchantOffer(new ItemCost(Items.EMERALD, SATELLITE_ANTENNA_PRICE), new ItemStack(antenna),
+                    Integer.MAX_VALUE, 0, 0.0F));
+        }
     }
 }

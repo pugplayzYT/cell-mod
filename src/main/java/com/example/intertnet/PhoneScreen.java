@@ -3,6 +3,7 @@ package com.example.intertnet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -12,6 +13,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -29,7 +31,7 @@ public class PhoneScreen extends Screen {
     private static final ResourceLocation SIM_ICON = ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "textures/item/sim_card.png");
 
     private static final int PHONE_W = 218;
-    private static final int PHONE_H = 190;
+    private static final int PHONE_H = 207;
     private static final String[] APPS = {"Messages", "SOS", "Delivery", "Rideshare"};
     private static final int TAB_GAP = 2;
     private static final int TAB_W = (PHONE_W - 10 - TAB_GAP * (APPS.length - 1)) / APPS.length;
@@ -38,6 +40,7 @@ public class PhoneScreen extends Screen {
     private int phoneY;
 
     private EditBox messageInputBox;
+    private Button satelliteAntennaButton;
     private int scrollOffset = 0;
 
     private String statusToast = "";
@@ -68,6 +71,9 @@ public class PhoneScreen extends Screen {
         this.messageInputBox.setMaxLength(110);
         this.messageInputBox.setHint(Component.literal("Message network..."));
         this.addRenderableWidget(this.messageInputBox);
+        this.satelliteAntennaButton = this.addRenderableWidget(Button.builder(Component.empty(), button ->
+                        PacketDistributor.sendToServer(new ModNetwork.TogglePhoneAntennaPayload()))
+                .bounds(this.phoneX + 27, this.phoneY + 188, PHONE_W - 34, 15).build());
 
         this.messageInputBox.setFocused(true);
     }
@@ -90,6 +96,7 @@ public class PhoneScreen extends Screen {
         if (player == null) return;
 
         String simNet = DeliveryManager.findPlayerSimNetwork(player);
+        boolean hasAntenna = PhoneItem.hasSatelliteAntenna(DeliveryManager.findPlayerPhoneStack(player));
         SignalManager.SignalStatus sig = SignalManager.getBestSignal(player, simNet);
         int bars = Mth.clamp(sig.bars(), 0, 4);
 
@@ -118,27 +125,27 @@ public class PhoneScreen extends Screen {
             String netId = ClientPhoneState.getSignal(player, simNet) != null
                     ? ClientPhoneState.getCurrentNetworkLabel()
                     : TowerNetworkManager.getNetworkId(player.level(), sig.connectedTowerPos());
-            sigLabel = bars + "/4 • " + netId;
+            sigLabel = sig.connectedViaGlobalSatellite() ? "SATELLITE • " + bars + "/4" : bars + "/4 • " + netId;
             sigColor = switch (bars) {
                 case 4 -> 0xFF34D399;
                 case 3 -> 0xFFA3E635;
                 case 2 -> 0xFFFACC15;
                 default -> 0xFFFB923C;
             };
-        } else if (simNet == null) {
-            sigLabel = "NO SIM CARD";
-            sigColor = 0xFFFBBF24;
         } else if (sig.satelliteSkyBlockedNearby()) {
             sigLabel = "SATELLITE SKY BLOCKED";
             sigColor = 0xFFF97316;
-        } else if (sig.missingOrWrongSim()) {
+        } else if (simNet == null && !hasAntenna) {
+            sigLabel = "NO SIM CARD";
+            sigColor = 0xFFFBBF24;
+        } else if (simNet != null && sig.missingOrWrongSim()) {
             sigLabel = "WRONG SIM NET";
             sigColor = 0xFFEF4444;
-        } else if (sig.unpoweredTowerNearby()) {
+        } else if (simNet != null && sig.unpoweredTowerNearby()) {
             sigLabel = "TOWER NO FUEL";
             sigColor = 0xFFF97316;
         } else {
-            sigLabel = "NO CELL SIGNAL";
+            sigLabel = hasAntenna ? "NO SATELLITE SIGNAL" : "NO CELL SIGNAL";
             sigColor = 0xFFEF4444;
         }
         int statusWidth = PHONE_W - 84;
@@ -147,10 +154,12 @@ public class PhoneScreen extends Screen {
         String subLine;
         if (bars > 0) {
             subLine = String.format(Locale.ROOT, "%dm · %ddBm", (int) sig.rawDistance(), sig.getSignalDbm());
-        } else if (simNet == null) {
-            subLine = "Buy or print a SIM";
         } else if (sig.satelliteSkyBlockedNearby()) {
             subLine = "Max " + SatelliteConnectorBlock.MAX_SKY_OBSTRUCTIONS + " blocks above";
+        } else if (hasAntenna) {
+            subLine = "Global Satellite covers the Overworld";
+        } else if (simNet == null) {
+            subLine = "Buy or print a SIM";
         } else {
             subLine = "Find a matching tower";
         }
@@ -229,10 +238,13 @@ public class PhoneScreen extends Screen {
             String ordText = "🚕 " + first.status();
             g.drawCenteredString(this.font, this.font.plainSubstrByWidth(ordText, footW - 6), footX + footW / 2, footY + 4, 0xFFFBBF24);
         } else {
-            String hint = bars > 0 ? "Connected via SIM [" + simNet + "]" : "Print a SIM at a Cell Tower to connect";
+            String hint = sig.connectedViaGlobalSatellite() ? "Connected via Global Satellite"
+                    : bars > 0 ? "Connected via SIM [" + simNet + "]" : "Find reception to use phone apps";
             g.drawCenteredString(this.font, this.font.plainSubstrByWidth(hint, footW - 6), footX + footW / 2, footY + 4, 0xFF64748B);
         }
 
+        g.renderItem(new ItemStack(IntertnetMod.PERSONAL_SATELLITE_ANTENNA.get()), x + 7, y + 187);
+        satelliteAntennaButton.setMessage(Component.literal(hasAntenna ? "Satellite SIM ready • Remove antenna" : "Attach satellite antenna"));
         super.render(g, mouseX, mouseY, partialTick);
     }
 
@@ -360,7 +372,7 @@ public class PhoneScreen extends Screen {
 
     private void sendCurrentMessage(int bars) {
         if (bars <= 0) {
-            showToast("Need SIM & signal to message!", 0xFFEF4444);
+            showToast("Need reception to message!", 0xFFEF4444);
             return;
         }
         if (this.messageInputBox == null) return;

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "intertnet:item/personal_satellite_antenna"
+  }
+}

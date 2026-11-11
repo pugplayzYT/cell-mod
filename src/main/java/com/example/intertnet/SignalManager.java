@@ -1,6 +1,7 @@
 package com.example.intertnet;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -41,7 +42,8 @@ public class SignalManager {
             boolean missingOrWrongSim,
             boolean unpoweredTowerNearby,
             boolean satelliteSkyBlockedNearby,
-            boolean connectedViaSatellite
+            boolean connectedViaSatellite,
+            boolean connectedViaGlobalSatellite
     ) {
         public int getDeliveryTicks() {
             return switch (bars) {
@@ -195,10 +197,28 @@ public class SignalManager {
                     false,
                     false,
                     false,
-                    best.tower().isSatelliteConnector()
+                    best.tower().isSatelliteConnector(),
+                    false
             );
         }
 
-        return new SignalStatus(0, null, 0.0, 0.0, 0, 0, missingOrWrongSim, unpoweredNearby, skyBlockedNearby, false);
+        if (level instanceof ServerLevel serverLevel && level.dimension() == Level.OVERWORLD
+                && PhoneItem.hasSatelliteAntenna(DeliveryManager.findPlayerPhoneStack(player))) {
+            int obstructions = SatelliteConnectorBlock.countSkyObstructions(level, BlockPos.containing(eyePos));
+            if (obstructions > SatelliteConnectorBlock.MAX_SKY_OBSTRUCTIONS) {
+                skyBlockedNearby = true;
+            } else {
+                BlockPos relay = GlobalSatelliteNetwork.findRelay(serverLevel, eyePos.x, eyePos.z);
+                if (relay != null) {
+                    double distance = eyePos.distanceTo(Vec3.atCenterOf(relay));
+                    int bars = Math.max(1, 4 - obstructions / 2 - (int) (distance / 384));
+                    double effectiveDistance = distance + obstructions * 128.0;
+                    return new SignalStatus(bars, relay, distance, effectiveDistance, GlobalSatelliteNetwork.RANGE,
+                            obstructions, false, false, false, true, true);
+                }
+            }
+        }
+
+        return new SignalStatus(0, null, 0.0, 0.0, 0, 0, missingOrWrongSim, unpoweredNearby, skyBlockedNearby, false, false);
     }
 }

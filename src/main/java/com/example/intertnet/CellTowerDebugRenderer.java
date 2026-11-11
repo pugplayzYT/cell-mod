@@ -113,7 +113,8 @@ public class CellTowerDebugRenderer {
         event.getLeft().add("Active Cell Towers in Level: §a" + towers.size() + "§r | Inserted SIM: §e" + (simNet != null ? simNet : "NONE") + "§r");
         if (sig.bars() > 0 && sig.connectedTowerPos() != null) {
             event.getLeft().add(String.format(Locale.ROOT,
-                    "Connected Tower: §a%s§r | Signal: §a%d/4 Bars (%d dBm)§r | Dist: §f%.1fm§r (Eff: §e%.1fm / %dm§r, Occluded: §c%d blks§r)",
+                    "%s: §a%s§r | Signal: §a%d/4 Bars (%d dBm)§r | Dist: §f%.1fm§r (Eff: §e%.1fm / %dm§r, Occluded: §c%d blks§r)",
+                    sig.connectedViaGlobalSatellite() ? "Satellite Relay" : "Connected Tower",
                     sig.connectedTowerPos().toShortString(),
                     sig.bars(),
                     sig.getSignalDbm(),

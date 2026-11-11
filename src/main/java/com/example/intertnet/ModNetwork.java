@@ -168,10 +168,23 @@ public class ModNetwork {
         }
     }
 
-    public record PhoneSignal(ResourceLocation dimension, @Nullable String sim, SignalManager.SignalStatus status) {
+    public record TogglePhoneAntennaPayload() implements CustomPacketPayload {
+        static final Type<TogglePhoneAntennaPayload> TYPE =
+                new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "toggle_phone_antenna"));
+        static final StreamCodec<FriendlyByteBuf, TogglePhoneAntennaPayload> STREAM_CODEC =
+                StreamCodec.unit(new TogglePhoneAntennaPayload());
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record PhoneSignal(ResourceLocation dimension, @Nullable String sim, boolean antenna, SignalManager.SignalStatus status) {
         private static void write(FriendlyByteBuf buf, PhoneSignal signal) {
             buf.writeResourceLocation(signal.dimension());
             buf.writeNullable(signal.sim(), FriendlyByteBuf::writeUtf);
+            buf.writeBoolean(signal.antenna());
             var status = signal.status();
             buf.writeVarInt(status.bars());
             buf.writeNullable(status.connectedTowerPos(), (output, pos) -> output.writeBlockPos(pos));
@@ -183,15 +196,17 @@ public class ModNetwork {
             buf.writeBoolean(status.unpoweredTowerNearby());
             buf.writeBoolean(status.satelliteSkyBlockedNearby());
             buf.writeBoolean(status.connectedViaSatellite());
+            buf.writeBoolean(status.connectedViaGlobalSatellite());
         }
 
         private static PhoneSignal read(FriendlyByteBuf buf) {
             ResourceLocation dimension = buf.readResourceLocation();
             String sim = buf.readNullable(FriendlyByteBuf::readUtf);
+            boolean antenna = buf.readBoolean();
             var status = new SignalManager.SignalStatus(buf.readVarInt(), buf.readNullable(input -> input.readBlockPos()),
                     buf.readDouble(), buf.readDouble(), buf.readVarInt(), buf.readVarInt(),
-                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
-            return new PhoneSignal(dimension, sim, status);
+                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+            return new PhoneSignal(dimension, sim, antenna, status);
         }
     }
 
@@ -267,7 +282,12 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("9");
+        final PayloadRegistrar registrar = event.registrar("10");
+        registrar.playToServer(TogglePhoneAntennaPayload.TYPE, TogglePhoneAntennaPayload.STREAM_CODEC, (payload, context) -> {
+            context.enqueueWork(() -> {
+                if (context.player() instanceof ServerPlayer player) PersonalSatelliteAntennaItem.toggle(player);
+            });
+        });
         registrar.playToServer(ServiceRequestPayload.TYPE, ServiceRequestPayload.STREAM_CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
@@ -463,12 +483,7 @@ public class ModNetwork {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            String simNet = DeliveryManager.findPlayerSimNetwork(player);
-            if (simNet == null) {
-                player.displayClientMessage(Component.literal("Cannot send message: Insert a SIM Card first!").withStyle(ChatFormatting.RED), true);
-                return;
-            }
-            DeliveryManager.postNetworkMessage(player, simNet, payload.message());
+            DeliveryManager.postNetworkMessage(player, payload.message());
         });
     }
 

@@ -104,8 +104,10 @@ final class EmergencyDispatch {
             return;
         }
         String sim = DeliveryManager.findPlayerSimNetwork(player);
-        if (SignalManager.getBestSignal(player, sim).bars() <= 0) {
-            notify(player, sim == null ? "Insert a SIM before calling." : "Emergency calls need reception.");
+        var signal = SignalManager.getBestSignal(player, sim);
+        if (signal.bars() <= 0) {
+            notify(player, signal.satelliteSkyBlockedNearby() ? "Move somewhere with clear sky to call."
+                    : "Emergency calls need phone reception.");
             return;
         }
         ServerLevel level = player.serverLevel();

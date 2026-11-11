@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "intertnet:block/cell_tower"
+    }
+  }
+}

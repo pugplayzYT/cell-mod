@@ -11,11 +11,28 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.List;
 
 public class SatelliteConnectorBlock extends CellTowerBlock {
     static final int MAX_SKY_OBSTRUCTIONS = 6;
+
+    static int countSkyObstructions(Level level, BlockPos pos) {
+        int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
+        BlockPos.MutableBlockPos above = pos.mutable();
+        int obstructions = 0;
+        for (int y = pos.getY() + 1; y < surface; y++) {
+            above.setY(y);
+            BlockState state = level.getBlockState(above);
+            if (!state.is(IntertnetMod.SATELLITE_RELAY.get())
+                    && (!state.getFluidState().isEmpty() || !state.getCollisionShape(level, above).isEmpty())
+                    && ++obstructions > MAX_SKY_OBSTRUCTIONS) {
+                break;
+            }
+        }
+        return obstructions;
+    }
 
     public SatelliteConnectorBlock(Properties properties) {
         super(properties);
