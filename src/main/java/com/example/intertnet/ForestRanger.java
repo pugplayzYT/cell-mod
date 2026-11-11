@@ -69,6 +69,11 @@ final class ForestRanger extends Pillager {
         return pos.equals(lookout) && !assigned;
     }
 
+    @Override
+    public boolean shouldBeSaved() {
+        return !getTags().contains(CampDispatch.BUILDER_TAG) && super.shouldBeSaved();
+    }
+
     void setAssigned(boolean value) {
         assigned = value;
         stopWalking();

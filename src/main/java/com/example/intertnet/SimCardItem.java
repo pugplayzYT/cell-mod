@@ -66,7 +66,7 @@ public class SimCardItem extends Item {
             }
             PhoneItem.setInsertedSimNetwork(phoneStack, simNet);
             level.playSound(null, sp.blockPosition(), SoundEvents.ARMOR_EQUIP_GOLD.value(), SoundSource.PLAYERS, 0.9f, 1.3f);
-            sp.displayClientMessage(Component.literal("💳 Inserted SIM Card [" + simNet + "] into your Phone!")
+            sp.displayClientMessage(Component.literal("💳 Inserted SIM Card [" + HotelAccess.simLabel(simNet) + "] into your Phone!")
                     .withStyle(ChatFormatting.GREEN), true);
             DeliveryManager.syncToPlayer(sp);
         }
@@ -78,7 +78,7 @@ public class SimCardItem extends Item {
         String net = getSimNetwork(stack);
         if (net != null) {
             tooltipComponents.add(Component.literal("Bound Network: ").withStyle(ChatFormatting.GRAY)
-                    .append(Component.literal(net).withStyle(ChatFormatting.GOLD)));
+                    .append(Component.literal(HotelAccess.simLabel(net)).withStyle(ChatFormatting.GOLD)));
         } else {
             tooltipComponents.add(Component.literal("Unprogrammed SIM Card").withStyle(ChatFormatting.RED));
         }

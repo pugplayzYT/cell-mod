@@ -52,7 +52,7 @@ public class PhoneItem extends Item {
         String simNet = getInsertedSimNetwork(stack);
         if (simNet != null) {
             tooltipComponents.add(Component.literal("SIM Card: ").withStyle(ChatFormatting.GRAY)
-                    .append(Component.literal("Inserted (" + simNet + ")").withStyle(ChatFormatting.GREEN)));
+                    .append(Component.literal("Inserted (" + HotelAccess.simLabel(simNet) + ")").withStyle(ChatFormatting.GREEN)));
         } else {
             tooltipComponents.add(Component.literal("SIM Card: ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("None (Insert a Tower SIM)").withStyle(ChatFormatting.RED)));

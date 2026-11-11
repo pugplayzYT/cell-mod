@@ -1,0 +1,8 @@
+{
+  "type": "intertnet:hotel",
+  "wild": true,
+  "biomes": "#intertnet:has_structure/wild_hotel",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

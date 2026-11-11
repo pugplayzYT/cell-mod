@@ -406,11 +406,12 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     }
 
     public boolean toggleWirelessLink(BlockPos targetPos) {
-        if (isSatelliteConnector() || isPublicTower() || targetPos == null || targetPos.equals(this.worldPosition)) return false;
+        if (isSatelliteConnector() || isPublicTower() || HotelAccess.isHotelTower(this)
+                || targetPos == null || targetPos.equals(this.worldPosition)) return false;
         BlockPos imm = targetPos.immutable();
         if (this.level == null || !this.level.isLoaded(imm)
                 || !(this.level.getBlockEntity(imm) instanceof CellTowerBlockEntity peer)
-                || peer.isPublicTower() || peer.isSatelliteConnector()) {
+                || peer.isPublicTower() || peer.isSatelliteConnector() || HotelAccess.isHotelTower(peer)) {
             return false;
         }
         boolean added;
@@ -555,6 +556,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
 
     @Override
     public boolean canPlaceItem(int index, ItemStack stack) {
+        if (HotelAccess.isHotelTower(this)) return index == FUEL_SLOT && stack.is(Items.COPPER_INGOT);
         if (index == ANTENNA_SLOT) {
             return !isSatelliteConnector() && !isPublicTower() && stack.getItem() instanceof AntennaItem;
         }

@@ -27,6 +27,38 @@ import java.util.List;
 public class ModNetwork {
     static final int EMERGENCY_FEEDBACK = -1;
     static final int RANGER_FEEDBACK = -2;
+    static final int CAMP_FEEDBACK = -3;
+    static final int HOTEL_FEEDBACK = -4;
+
+    public record CampCallPayload(boolean confirm) implements CustomPacketPayload {
+        static final Type<CampCallPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "camp_call"));
+        static final StreamCodec<FriendlyByteBuf, CampCallPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.BOOL, CampCallPayload::confirm, CampCallPayload::new);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record CampQuotePayload(String message, int seconds, String site) implements CustomPacketPayload {
+        static final Type<CampQuotePayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "camp_quote"));
+        static final StreamCodec<FriendlyByteBuf, CampQuotePayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.STRING_UTF8, CampQuotePayload::message,
+                        ByteBufCodecs.VAR_INT, CampQuotePayload::seconds, ByteBufCodecs.STRING_UTF8, CampQuotePayload::site,
+                        CampQuotePayload::new);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record HotelReceptionPayload(int entityId) implements CustomPacketPayload {
+        static final Type<HotelReceptionPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "hotel_reception"));
+        static final StreamCodec<FriendlyByteBuf, HotelReceptionPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.VAR_INT, HotelReceptionPayload::entityId, HotelReceptionPayload::new);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    public record BuyHotelPassPayload(int entityId) implements CustomPacketPayload {
+        static final Type<BuyHotelPassPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "buy_hotel_pass"));
+        static final StreamCodec<FriendlyByteBuf, BuyHotelPassPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.VAR_INT, BuyHotelPassPayload::entityId, BuyHotelPassPayload::new);
+        @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
 
     public record RangerCallPayload(boolean confirm) implements CustomPacketPayload {
         static final Type<RangerCallPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "ranger_call"));
@@ -329,7 +361,19 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("11");
+        final PayloadRegistrar registrar = event.registrar("12");
+        registrar.playToServer(CampCallPayload.TYPE, CampCallPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) CampDispatch.request(player, payload.confirm());
+                }));
+        registrar.playToServer(BuyHotelPassPayload.TYPE, BuyHotelPassPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) HotelAccess.buyPass(player, payload.entityId());
+                }));
+        registrar.playToClient(CampQuotePayload.TYPE, CampQuotePayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> ClientHooks.receiveCampQuote(payload)));
+        registrar.playToClient(HotelReceptionPayload.TYPE, HotelReceptionPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> ClientHooks.openHotelReception(payload.entityId())));
         registrar.playToServer(RangerCallPayload.TYPE, RangerCallPayload.STREAM_CODEC, (payload, context) ->
                 context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) RangerDispatch.request(player, payload.confirm());
@@ -406,6 +450,10 @@ public class ModNetwork {
             if (!(be instanceof CellTowerBlockEntity tower)) {
                 return;
             }
+            if (HotelAccess.isHotelTower(tower)) {
+                player.displayClientMessage(Component.literal("Hotel guest SIMs are issued at check-in."), true);
+                return;
+            }
 
             if (tower.isPublicTower()) {
                 player.displayClientMessage(Component.literal("Get your Open World SIM from the vendor at the base of the tower."), true);
@@ -475,7 +523,7 @@ public class ModNetwork {
                     player.drop(ejectedSim, false);
                 }
                 player.level().playSound(null, player.blockPosition(), SoundEvents.ARMOR_EQUIP_IRON.value(), SoundSource.PLAYERS, 0.8f, 1.4f);
-                player.displayClientMessage(Component.literal("⏏ Ejected SIM Card [" + currentSim + "] from Phone.")
+                player.displayClientMessage(Component.literal("⏏ Ejected SIM Card [" + HotelAccess.simLabel(currentSim) + "] from Phone.")
                         .withStyle(ChatFormatting.YELLOW), true);
                 DeliveryManager.syncToPlayer(player);
                 return;
@@ -513,7 +561,7 @@ public class ModNetwork {
 
             PhoneItem.setInsertedSimNetwork(phoneStack, newSimNet);
             player.level().playSound(null, player.blockPosition(), SoundEvents.ARMOR_EQUIP_GOLD.value(), SoundSource.PLAYERS, 0.9f, 1.3f);
-            player.displayClientMessage(Component.literal("💳 Inserted SIM Card [" + newSimNet + "] into your Phone!")
+            player.displayClientMessage(Component.literal("💳 Inserted SIM Card [" + HotelAccess.simLabel(newSimNet) + "] into your Phone!")
                     .withStyle(ChatFormatting.GREEN), true);
             DeliveryManager.syncToPlayer(player);
         });

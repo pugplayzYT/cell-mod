@@ -69,12 +69,13 @@ public class PhoneHudOverlay {
 
         String subText = bars > 0
                 ? ((int) sig.rawDistance() + "m • " + sig.getSignalDbm() + "dBm")
-                : (simNet != null ? simNet : hasAntenna ? "Satellite" : "Insert SIM");
+                : (simNet != null ? HotelAccess.simLabel(simNet) : hasAntenna ? "Satellite" : "Insert SIM");
         g.drawString(mc.font, mc.font.plainSubstrByWidth(subText, 68), boxX + 47, boxY + 12, 0xFF94A3B8, false);
 
         if (hasOrders) {
             ModNetwork.OrderSnapshot first = orders.get(0);
-            String ordLine = first.orderId().equals(RangerDispatch.ORDER_ID) ? first.status() : "🚕 " + first.status();
+            String ordLine = first.orderId().equals(RangerDispatch.ORDER_ID) || first.orderId().equals(CampDispatch.ORDER_ID)
+                    ? first.status() : "🚕 " + first.status();
             g.drawString(mc.font, mc.font.plainSubstrByWidth(ordLine, boxW - 8), boxX + 4, boxY + 23, 0xFFFBBF24, false);
         }
     }

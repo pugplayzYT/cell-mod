@@ -22,6 +22,10 @@ public class ClientHooks {
             screen.setFeedback(payload.message());
         } else if (payload.mode() == ModNetwork.RANGER_FEEDBACK && Minecraft.getInstance().screen instanceof RangerScreen screen) {
             screen.setFeedback(payload.message());
+        } else if (payload.mode() == ModNetwork.CAMP_FEEDBACK && Minecraft.getInstance().screen instanceof CampScreen screen) {
+            screen.setFeedback(payload.message());
+        } else if (payload.mode() == ModNetwork.HOTEL_FEEDBACK && Minecraft.getInstance().screen instanceof HotelReceptionScreen screen) {
+            screen.setFeedback(payload.message());
         } else if (Minecraft.getInstance().screen instanceof TownServiceScreen screen) {
             screen.setFeedback(payload);
         }
@@ -33,5 +37,13 @@ public class ClientHooks {
 
     static void openRangerMeeting(int entityId) {
         Minecraft.getInstance().setScreen(new RangerScreen(entityId));
+    }
+
+    static void receiveCampQuote(ModNetwork.CampQuotePayload payload) {
+        if (Minecraft.getInstance().screen instanceof CampScreen screen) screen.setQuote(payload);
+    }
+
+    static void openHotelReception(int entityId) {
+        Minecraft.getInstance().setScreen(new HotelReceptionScreen(entityId));
     }
 }

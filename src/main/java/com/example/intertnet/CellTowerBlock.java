@@ -57,7 +57,9 @@ public class CellTowerBlock extends BaseEntityBlock {
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
             BlockEntity be = level.getBlockEntity(pos);
             if (be instanceof CellTowerBlockEntity tower) {
-                if (tower.isPublicTower()) {
+                if (HotelAccess.isHotelTower(tower)) {
+                    serverPlayer.displayClientMessage(Component.literal("Hotel Wi-Fi is available with a guest SIM."), true);
+                } else if (tower.isPublicTower()) {
                     serverPlayer.displayClientMessage(Component.literal("Open World tower • High antenna • "
                             + tower.getConfiguredRange() + "m range. Get a SIM at the stall."), true);
                 } else {

@@ -1,0 +1,27 @@
+{
+  "structures": [
+    {
+      "structure": "intertnet:wild_hotel",
+      "weight": 1
+    },
+    {
+      "structure": "intertnet:plains_hotel",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 16,
+    "separation": 7,
+    "salt": 56391841,
+    "locate_offset": [
+      8,
+      0,
+      15
+    ],
+    "exclusion_zone": {
+      "other_set": "minecraft:villages",
+      "chunk_count": 3
+    }
+  }
+}

@@ -155,7 +155,7 @@ public class DeliveryManager {
     }
 
     private static String carrier(ModNetwork.PhoneSignal signal) {
-        return signal.status().connectedViaGlobalSatellite() ? GlobalSatelliteNetwork.NAME : signal.sim();
+        return signal.status().connectedViaGlobalSatellite() ? GlobalSatelliteNetwork.NAME : HotelAccess.simLabel(signal.sim());
     }
 
     private static void syncToPlayer(ServerPlayer player, @Nullable ModNetwork.PhoneSignal signal, List<String> peers) {
@@ -163,6 +163,7 @@ public class DeliveryManager {
         TownServices.addTracking(player, orders);
         EmergencyDispatch.addTracking(player, orders);
         RangerDispatch.addTracking(player, orders);
+        CampDispatch.addTracking(player, orders);
 
         List<ModNetwork.MessageSnapshot> messages = new ArrayList<>();
         List<String> peersOnNetwork = List.of();

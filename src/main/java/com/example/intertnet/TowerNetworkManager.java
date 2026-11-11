@@ -21,7 +21,7 @@ public class TowerNetworkManager {
         int radius = 256;
         BlockEntity srcBe = level.getBlockEntity(sourceTowerPos);
         if (srcBe instanceof CellTowerBlockEntity srcTower) {
-            if (srcTower.isSatelliteConnector() || srcTower.isPublicTower()) {
+            if (srcTower.isSatelliteConnector() || srcTower.isPublicTower() || HotelAccess.isHotelTower(srcTower)) {
                 return List.of();
             }
             radius = srcTower.getLinkRange();
@@ -29,7 +29,7 @@ public class TowerNetworkManager {
         double maxDistSqr = (double) radius * (double) radius;
         List<CellTowerBlockEntity> result = new ArrayList<>();
         for (CellTowerBlockEntity tower : all) {
-            if (tower.isSatelliteConnector() || tower.isPublicTower()) continue;
+            if (tower.isSatelliteConnector() || tower.isPublicTower() || HotelAccess.isHotelTower(tower)) continue;
             if (tower.getBlockPos().equals(sourceTowerPos)) continue;
             if (tower.getBlockPos().distSqr(sourceTowerPos) <= maxDistSqr) {
                 result.add(tower);
@@ -41,7 +41,8 @@ public class TowerNetworkManager {
 
     public static List<CellTowerBlockEntity> getConnectedNetworkTowers(Level level, BlockPos startTowerPos) {
         BlockEntity startBe = level.getBlockEntity(startTowerPos);
-        if (startBe instanceof CellTowerBlockEntity startTower && (startTower.isSatelliteConnector() || startTower.isPublicTower())) {
+        if (startBe instanceof CellTowerBlockEntity startTower
+                && (startTower.isSatelliteConnector() || startTower.isPublicTower() || HotelAccess.isHotelTower(startTower))) {
             return List.of(startTower);
         }
 
@@ -81,6 +82,7 @@ public class TowerNetworkManager {
 
     public static String getNetworkId(Level level, BlockPos towerPos) {
         BlockEntity be = level.getBlockEntity(towerPos);
+        if (be instanceof CellTowerBlockEntity tower && HotelAccess.isHotelTower(tower)) return "Hotel Wi-Fi";
         if (be instanceof CellTowerBlockEntity tower && (tower.isSatelliteConnector() || tower.isPublicTower())) {
             return tower.getNetworkUid();
         }
@@ -111,7 +113,7 @@ public class TowerNetworkManager {
     }
 
     public static void syncNetworkUidAcrossChain(Level level, CellTowerBlockEntity sourceTower) {
-        if (sourceTower.isSatelliteConnector() || sourceTower.isPublicTower()) return;
+        if (sourceTower.isSatelliteConnector() || sourceTower.isPublicTower() || HotelAccess.isHotelTower(sourceTower)) return;
         List<CellTowerBlockEntity> linked = getConnectedNetworkTowers(level, sourceTower.getBlockPos());
         String canonicalUid = getCanonicalNetworkKey(level, sourceTower.getBlockPos());
         for (CellTowerBlockEntity peer : linked) {
@@ -124,6 +126,7 @@ public class TowerNetworkManager {
             return false;
         }
         String cleanSim = simNetwork.trim();
+        if (HotelAccess.isHotelTower(tower)) return HotelAccess.matchesWifi(level, tower.getNetworkUid(), cleanSim);
         if (tower.isPublicTower()) {
             return PUBLIC_NETWORK.equalsIgnoreCase(cleanSim);
         }

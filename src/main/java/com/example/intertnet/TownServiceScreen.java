@@ -26,6 +26,7 @@ final class TownServiceScreen extends Screen {
     private int panelWidth;
     private int panelX;
     private int panelY;
+    private int extraRow;
 
     TownServiceScreen(TownServices.Mode mode, Screen parent, int reference) {
         super(Component.literal(mode.label));
@@ -43,19 +44,20 @@ final class TownServiceScreen extends Screen {
     protected void init() {
         panelWidth = Math.min(width - 12, MAX_PANEL_WIDTH);
         panelX = (width - panelWidth) / 2;
-        panelY = (height - PANEL_HEIGHT) / 2;
+        extraRow = mode == TownServices.Mode.RIDESHARE ? 22 : 0;
+        panelY = (height - PANEL_HEIGHT - extraRow) / 2;
         orderButtons.clear();
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3 + extraRow / 22; i++) {
             int index = i;
             orderButtons.add(addRenderableWidget(Button.builder(Component.empty(), button -> placeOrder(index))
                     .bounds(panelX + 10, panelY + 42 + i * 22, panelWidth - 20, 20).build()));
         }
         int navWidth = Math.min(84, (panelWidth - 26) / 2);
         addRenderableWidget(Button.builder(Component.literal(parent == null ? "Close" : "Back"), button -> onClose())
-                .bounds(panelX + 10, panelY + 163, navWidth, 19).build());
+                .bounds(panelX + 10, panelY + 163 + extraRow, navWidth, 19).build());
         if (mode != TownServices.Mode.DINING) {
             addRenderableWidget(Button.builder(Component.literal("Refresh"), button -> refreshQuotes())
-                    .bounds(panelX + panelWidth - 10 - navWidth, panelY + 163, navWidth, 19).build());
+                    .bounds(panelX + panelWidth - 10 - navWidth, panelY + 163 + extraRow, navWidth, 19).build());
             if (!requestedQuotes) {
                 refreshQuotes();
             }
@@ -141,8 +143,8 @@ final class TownServiceScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        g.fill(panelX, panelY, panelX + panelWidth, panelY + PANEL_HEIGHT, 0xFF111827);
-        g.renderOutline(panelX, panelY, panelWidth, PANEL_HEIGHT, 0xFF64748B);
+        g.fill(panelX, panelY, panelX + panelWidth, panelY + PANEL_HEIGHT + extraRow, 0xFF111827);
+        g.renderOutline(panelX, panelY, panelWidth, PANEL_HEIGHT + extraRow, 0xFF64748B);
         g.drawCenteredString(font, title, panelX + panelWidth / 2, panelY + 9, 0xFF7DD3FC);
         drawStatus(g, message, 22, 0xFFE2E8F0);
 
@@ -150,15 +152,15 @@ final class TownServiceScreen extends Screen {
                 .ifPresent(order -> {
                     String remaining = order.remainingMeters() > 0 ? " · " + order.remainingMeters() + "m" : "";
                     g.drawCenteredString(font, PhoneScreen.fit(font, order.status() + remaining, panelWidth - 20),
-                            panelX + panelWidth / 2, panelY + 111, 0xFFFBBF24);
+                            panelX + panelWidth / 2, panelY + 111 + extraRow, 0xFFFBBF24);
                     g.drawCenteredString(font, PhoneScreen.fit(font, order.destCoords(), panelWidth - 20),
-                            panelX + panelWidth / 2, panelY + 123, 0xFF94A3B8);
+                            panelX + panelWidth / 2, panelY + 123 + extraRow, 0xFF94A3B8);
                     int barWidth = panelWidth - 20;
-                    g.fill(panelX + 10, panelY + 134, panelX + 10 + barWidth, panelY + 137, 0xFF334155);
-                    g.fill(panelX + 10, panelY + 134, panelX + 10 + barWidth * order.progressPercent() / 100,
-                            panelY + 137, 0xFF10B981);
+                    g.fill(panelX + 10, panelY + 134 + extraRow, panelX + 10 + barWidth, panelY + 137 + extraRow, 0xFF334155);
+                    g.fill(panelX + 10, panelY + 134 + extraRow, panelX + 10 + barWidth * order.progressPercent() / 100,
+                            panelY + 137 + extraRow, 0xFF10B981);
                 });
-        drawStatus(g, feedback, 141, 0xFF7DD3FC);
+        drawStatus(g, feedback, 141 + extraRow, 0xFF7DD3FC);
         super.render(g, mouseX, mouseY, partialTick);
     }
 

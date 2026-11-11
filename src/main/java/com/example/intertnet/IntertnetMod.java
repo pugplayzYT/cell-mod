@@ -73,6 +73,10 @@ public class IntertnetMod {
             STRUCTURES.register("ranger_lookout", () -> () -> RangerLookoutStructure.CODEC);
     static final DeferredHolder<StructurePieceType, StructurePieceType> RANGER_LOOKOUT_PIECE =
             STRUCTURE_PIECES.register("ranger_lookout", () -> (StructurePieceType.ContextlessType) RangerLookoutPiece::new);
+    static final DeferredHolder<StructureType<?>, StructureType<HotelStructure>> HOTEL_STRUCTURE =
+            STRUCTURES.register("hotel", () -> () -> HotelStructure.CODEC);
+    static final DeferredHolder<StructurePieceType, StructurePieceType> HOTEL_PIECE =
+            STRUCTURE_PIECES.register("hotel", () -> (StructurePieceType.ContextlessType) HotelPiece::new);
     static final DeferredHolder<EntityType<?>, EntityType<ForestRanger>> FOREST_RANGER =
             ENTITIES.register("forest_ranger", () -> EntityType.Builder.<ForestRanger>of(ForestRanger::new, MobCategory.MISC)
                     .sized(0.6f, 1.95f).clientTrackingRange(8).build("intertnet:forest_ranger"));
@@ -177,6 +181,8 @@ public class IntertnetMod {
         TowerGuards.register();
         EmergencyDispatch.register();
         RangerDispatch.register();
+        CampDispatch.register();
+        HotelAccess.register();
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientRegistrar.register(modEventBus);

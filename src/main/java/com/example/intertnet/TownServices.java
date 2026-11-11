@@ -329,6 +329,11 @@ final class TownServices {
             villages.ifPresent(tag -> addRide(offers, 0, "Village", pickup, nearest(level, tag, pickup, MAX_RIDE_DISTANCE)));
             addRide(offers, 1, "Restaurant", pickup, nearest(level, ServiceSiteStructure.RESTAURANT, pickup, MAX_RIDE_DISTANCE));
             addRide(offers, 2, MANSION_LABEL, pickup, nearest(level, MANSION, pickup, MAX_RIDE_DISTANCE));
+            BlockPos wildHotel = nearest(level, HotelStructure.WILD, pickup, MAX_RIDE_DISTANCE);
+            BlockPos plainsHotel = nearest(level, HotelStructure.PLAINS, pickup, MAX_RIDE_DISTANCE);
+            BlockPos hotel = wildHotel == null || (plainsHotel != null && distance(pickup, plainsHotel) < distance(pickup, wildHotel))
+                    ? plainsHotel : wildHotel;
+            addRide(offers, 3, "Hotel", pickup, hotel);
             message = offers.isEmpty() ? "No destinations within range." : "Choose a destination";
         }
         Quotes quotes = new Quotes(++nextQuoteId, level.dimension(), pickup, level.getGameTime(), source, List.copyOf(offers), message);

@@ -32,7 +32,7 @@ public class PhoneScreen extends Screen {
 
     private static final int PHONE_W = 218;
     private static final int PHONE_H = 207;
-    private static final String[] APPS = {"Texts", "SOS", "Delivery", "Rides", "Ranger"};
+    private static final String[] APPS = {"Texts", "SOS", "Food", "Rides", "Ranger", "Camp"};
     private static final int TAB_GAP = 2;
     private static final int TAB_W = (PHONE_W - 10 - TAB_GAP * (APPS.length - 1)) / APPS.length;
 
@@ -193,7 +193,7 @@ public class PhoneScreen extends Screen {
             g.renderOutline(insX, insY, 52, 12, 0xFF34D399);
             g.drawCenteredString(this.font, "Insert SIM", insX + 26, insY + 2, 0xFFFFFFFF);
         } else {
-            String simLabel = fit(this.font, "SIM: " + simNet, PHONE_W - 100);
+            String simLabel = fit(this.font, "SIM: " + HotelAccess.simLabel(simNet), PHONE_W - 100);
             g.drawString(this.font, simLabel, x + 22, y + 34, 0xFF34D399, false);
 
             int swapX = x + PHONE_W - 74;
@@ -239,7 +239,7 @@ public class PhoneScreen extends Screen {
             g.drawCenteredString(this.font, this.font.plainSubstrByWidth(ordText, footW - 6), footX + footW / 2, footY + 4, 0xFFFBBF24);
         } else {
             String hint = sig.connectedViaGlobalSatellite() ? "Connected via Global Satellite"
-                    : bars > 0 ? "Connected via SIM [" + simNet + "]" : "Find reception to use phone apps";
+                    : bars > 0 ? "Connected via SIM [" + HotelAccess.simLabel(simNet) + "]" : "Find reception to use phone apps";
             g.drawCenteredString(this.font, this.font.plainSubstrByWidth(hint, footW - 6), footX + footW / 2, footY + 4, 0xFF64748B);
         }
 
@@ -351,6 +351,8 @@ public class PhoneScreen extends Screen {
                             Minecraft.getInstance().setScreen(new EmergencyScreen(this));
                         } else if (i == 4) {
                             Minecraft.getInstance().setScreen(new RangerScreen(this));
+                        } else if (i == 5) {
+                            Minecraft.getInstance().setScreen(new CampScreen(this));
                         } else {
                             var mode = i == 2 ? TownServices.Mode.DELIVERY : TownServices.Mode.RIDESHARE;
                             Minecraft.getInstance().setScreen(new TownServiceScreen(mode, this, 0));

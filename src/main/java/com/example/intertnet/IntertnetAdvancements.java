@@ -32,7 +32,7 @@ final class IntertnetAdvancements {
             }
         } else {
             BlockEntity source = player.serverLevel().getBlockEntity(signal.connectedTowerPos());
-            if (source instanceof CellTowerBlockEntity tower && !tower.isPublicTower()) {
+            if (source instanceof CellTowerBlockEntity tower && !tower.isPublicTower() && !HotelAccess.isHotelTower(tower)) {
                 award(player, PRIVATE_NETWORK);
             }
         }

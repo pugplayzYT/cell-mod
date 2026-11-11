@@ -88,7 +88,15 @@ public class GuidebookHelper {
 
                 page(Component.literal("15. Forest Ranger\n")
                         .withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)
-                        .append(Component.literal("\nIn a forest, open Ranger with phone reception. A nearby lookout sends a ranger for 3 emeralds.\n\nMeet them outdoors, right-click, and follow them up to shelter.").withStyle(ChatFormatting.BLACK)))
+                        .append(Component.literal("\nIn a forest, open Ranger with phone reception. A nearby lookout sends a ranger for 3 emeralds.\n\nMeet them outdoors, right-click, and follow them up to shelter.").withStyle(ChatFormatting.BLACK))),
+
+                page(Component.literal("16. Hotels\n")
+                        .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
+                        .append(Component.literal("\nBuy a pass for 3 emeralds. Use it at the entrance and a vacant room hopper.\n\nWild hotels lend a Wi-Fi SIM. Put your pass in Checkout to end your stay and open the exit.").withStyle(ChatFormatting.BLACK))),
+
+                page(Component.literal("17. Rescue Camp\n")
+                        .withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)
+                        .append(Component.literal("\nOpen Camp with reception. A ranger lookout crew builds a shelter for 8 emeralds.\n\nTake your gear and stand clear before pulling the demolition lever. It lights real TNT.").withStyle(ChatFormatting.BLACK)))
         );
 
         WrittenBookContent content = new WrittenBookContent(

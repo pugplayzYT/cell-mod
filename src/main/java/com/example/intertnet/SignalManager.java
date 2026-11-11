@@ -2,6 +2,7 @@ package com.example.intertnet;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -157,6 +158,8 @@ public class SignalManager {
         if (level.isClientSide) {
             SignalStatus serverSignal = ClientPhoneState.getSignal(player, simNetwork);
             if (serverSignal != null) return serverSignal;
+        } else if (player instanceof ServerPlayer serverPlayer && !HotelAccess.canUseSim(serverPlayer, simNetwork)) {
+            simNetwork = null;
         }
         Vec3 eyePos = player.getEyePosition();
         List<CellTowerBlockEntity> towers = getActiveTowerEntities(level);
