@@ -55,7 +55,7 @@ final class HotelAccess {
     private record Reader(Site site, int role) {}
     private record DoorKey(ServerLevel level, BlockPos pos) {}
     private record Lease(Direction crossing, long expiry, @Nullable Site entry) {}
-    private record LoadedHotel(ServerLevel level, ChunkPos chunk, Site site) {}
+    private record LoadedHotel(ServerLevel level, ChunkPos chunk, Site site, HotelPiece piece) {}
     private record Stay(UUID token, Site site, int room, boolean entered) {
         String sim() { return SIM + token; }
     }
@@ -280,7 +280,8 @@ final class HotelAccess {
                 if (piece instanceof HotelPiece hotel) {
                     ChunkPos chunk = start.getChunkPos();
                     loadedHotels.add(new LoadedHotel(level, chunk,
-                            new Site(new BlockPos(chunk.getMinBlockX(), piece.getBoundingBox().minY(), chunk.getMinBlockZ()), hotel.isWild())));
+                            new Site(new BlockPos(chunk.getMinBlockX(), piece.getBoundingBox().minY(), chunk.getMinBlockZ()), hotel.isWild()),
+                            hotel));
                 }
             }
         }
@@ -288,7 +289,9 @@ final class HotelAccess {
 
     private static void tick(ServerTickEvent.Post event) {
         for (LoadedHotel hotel; (hotel = loadedHotels.poll()) != null;) {
-            if (hotel.level.getChunkSource().getChunkNow(hotel.chunk.x, hotel.chunk.z) == null) continue;
+            var chunk = hotel.level.getChunkSource().getChunkNow(hotel.chunk.x, hotel.chunk.z);
+            if (chunk == null) continue;
+            if (hotel.piece.repairLayout(hotel.level)) chunk.setUnsaved(true);
             closeIdleDoor(hotel.level, hotel.site.entrance());
             for (BlockPos room : HotelPiece.ROOM_DOORS) closeIdleDoor(hotel.level, hotel.site.origin.offset(room));
         }

@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.npc.Villager;
@@ -16,6 +17,8 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
@@ -40,10 +43,12 @@ final class HotelPiece extends StructurePiece {
             new BlockPos(5, 1, 9), new BlockPos(10, 1, 9));
     private final boolean wild;
     private boolean staffed;
+    private boolean repairedLayout;
 
     HotelPiece(int x, int y, int z, boolean wild) {
         super(IntertnetMod.HOTEL_PIECE.get(), 0, new BoundingBox(x, y, z, x + 15, y + (wild ? 11 : 6), z + 15));
         this.wild = wild;
+        repairedLayout = true;
         setOrientation(Direction.SOUTH);
     }
 
@@ -51,6 +56,7 @@ final class HotelPiece extends StructurePiece {
         super(IntertnetMod.HOTEL_PIECE.get(), tag);
         wild = tag.getBoolean("Wild");
         staffed = tag.getBoolean("Staffed");
+        repairedLayout = tag.getBoolean("RepairedLayout");
     }
 
     boolean isWild() {
@@ -71,6 +77,7 @@ final class HotelPiece extends StructurePiece {
     protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag) {
         tag.putBoolean("Wild", wild);
         tag.putBoolean("Staffed", staffed);
+        tag.putBoolean("RepairedLayout", repairedLayout);
     }
 
     @Override
@@ -109,8 +116,8 @@ final class HotelPiece extends StructurePiece {
             placeBlock(level, bed, x, 1, z, box);
             placeBlock(level, bed.setValue(BedBlock.PART, BedPart.HEAD), x, 1, z - 1, box);
             put(level, box, x, 1, z + 1, Blocks.CRAFTING_TABLE);
-            put(level, box, left ? 3 : 12, 1, z + 2, Blocks.BLAST_FURNACE);
-            put(level, box, left ? 4 : 11, 1, z + 2, Blocks.FURNACE);
+            placeBlock(level, facing(Blocks.BLAST_FURNACE, Direction.SOUTH), left ? 3 : 12, 1, z + 2, box);
+            placeBlock(level, facing(Blocks.FURNACE, Direction.SOUTH), left ? 4 : 11, 1, z + 2, box);
             put(level, box, left ? 4 : 11, 1, z - 1, Blocks.LANTERN);
         }
         put(level, box, 9, 1, 3, Blocks.LANTERN);
@@ -121,16 +128,10 @@ final class HotelPiece extends StructurePiece {
                 tower.setNetworkUid(HotelAccess.wifiNetwork(getWorldPos(0, 0, 0)));
                 tower.setItem(CellTowerBlockEntity.FUEL_SLOT, new ItemStack(Items.COPPER_INGOT, 16));
             }
-            BlockState stair = Blocks.STONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
-            for (int z = 7; z <= 12; z++) {
-                int y = z - 7;
-                generateAirBox(level, box, 7, y + 1, z, 8, y + 2, z);
-                for (int x = 7; x <= 8; x++) placeBlock(level, stair, x, y, z, box);
-                put(level, box, 6, y + 3, z, Blocks.DARK_OAK_PLANKS);
-                put(level, box, 9, y + 3, z, Blocks.DARK_OAK_PLANKS);
-                fill(level, box, 7, y + 3, z, 8, y + 3, z, Blocks.DARK_OAK_PLANKS);
+            for (int x = 7; x <= 8; x++) {
+                for (int z = 7; z <= 12; z++) buildStairColumn(level, box, x, z);
             }
-            put(level, box, 7, 2, 6, Blocks.LANTERN);
+            lightCheckout(level, box);
         }
         for (int x = 4; x <= 11; x++) {
             for (int z = 13; z <= 15; z++) {
@@ -175,9 +176,80 @@ final class HotelPiece extends StructurePiece {
             BlockPos sign = new BlockPos(9, offset.getY() + 1, 14);
             put(level, box, 9, offset.getY() + 1, 13, wild ? Blocks.DARK_OAK_PLANKS : Blocks.OAK_PLANKS);
             wallSign(level, box, sign, Direction.NORTH, label, "Pass returned");
+        } else if (role == EXIT) {
+            wallSign(level, box, offset.above(), wild ? Direction.EAST : Direction.SOUTH, label, "Pass ends stay");
         } else {
-            wallSign(level, box, offset.above(), role == EXIT && wild ? Direction.EAST : Direction.SOUTH,
-                    label, role == EXIT ? "Pass ends stay" : "Pass returned");
+            Direction hall = roomHallDirection(role);
+            wallSign(level, box, offset.above().relative(hall), hall, label, "Pass returned");
+        }
+    }
+
+    private void buildStairColumn(WorldGenLevel level, BoundingBox box, int x, int z) {
+        int y = z - 6;
+        fill(level, box, x, 0, z, x, y - 1, z, Blocks.STONE_BRICKS);
+        generateAirBox(level, box, x, y + 1, z, x, y + 3, z);
+        placeBlock(level, Blocks.STONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH),
+                x, y, z, box);
+    }
+
+    private void lightCheckout(WorldGenLevel level, BoundingBox box) {
+        placeBlock(level, Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true), 6, 3, 6, box);
+    }
+
+    private static Direction roomHallDirection(int role) {
+        return ROOM_DOORS.get(role).getX() == 5 ? Direction.EAST : Direction.WEST;
+    }
+
+    private static BlockState facing(Block block, Direction direction) {
+        return block.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, direction);
+    }
+
+    boolean repairLayout(ServerLevel level) {
+        if (repairedLayout) return false;
+        BoundingBox box = getBoundingBox();
+        for (int role = 0; role < ROOM_DOORS.size(); role++) {
+            BlockPos door = ROOM_DOORS.get(role);
+            boolean left = door.getX() == 5;
+            BlockPos cap = reader(wild, role).above();
+            Direction hall = roomHallDirection(role);
+            BlockPos label = cap.relative(hall);
+            BlockState oldCap = level.getBlockState(world(cap));
+            if (oldCap.is(Blocks.SPRUCE_WALL_SIGN) || oldCap.isAir()) {
+                put(level, box, cap.getX(), cap.getY(), cap.getZ(), wild ? Blocks.MOSSY_STONE_BRICKS : Blocks.STRIPPED_OAK_WOOD);
+                if (level.isEmptyBlock(world(label))) wallSign(level, box, label, hall, "Room " + (role + 1), "Pass returned");
+            }
+            turnFurnace(level, new BlockPos(left ? 3 : 12, 1, door.getZ() + 2), Blocks.BLAST_FURNACE);
+            turnFurnace(level, new BlockPos(left ? 4 : 11, 1, door.getZ() + 2), Blocks.FURNACE);
+        }
+        if (wild) {
+            for (int z = 7; z <= 12; z++) {
+                int oldStepY = z - 7;
+                for (int x = 7; x <= 8; x++) {
+                    if (level.getBlockState(getWorldPos(x, oldStepY, z)).is(Blocks.STONE_BRICK_STAIRS)) {
+                        buildStairColumn(level, box, x, z);
+                    }
+                }
+                for (int x : new int[]{6, 9}) {
+                    BlockPos cap = getWorldPos(x, oldStepY + 3, z);
+                    if (level.getBlockState(cap).is(Blocks.DARK_OAK_PLANKS)) {
+                        level.setBlock(cap, (oldStepY + 3 == 4 ? Blocks.STONE_BRICKS : Blocks.AIR).defaultBlockState(),
+                                Block.UPDATE_CLIENTS);
+                    }
+                }
+            }
+            BlockPos oldLight = getWorldPos(7, 2, 6);
+            if (level.getBlockState(oldLight).is(Blocks.LANTERN)) level.removeBlock(oldLight, false);
+            if (level.isEmptyBlock(getWorldPos(6, 3, 6))) lightCheckout(level, box);
+        }
+        repairedLayout = true;
+        return true;
+    }
+
+    private void turnFurnace(ServerLevel level, BlockPos offset, Block block) {
+        BlockPos pos = world(offset);
+        BlockState state = level.getBlockState(pos);
+        if (state.is(block)) {
+            level.setBlock(pos, state.setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH), Block.UPDATE_CLIENTS);
         }
     }
 

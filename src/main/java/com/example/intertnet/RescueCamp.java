@@ -10,7 +10,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.LeverBlock;
 import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
@@ -96,24 +98,36 @@ final class RescueCamp {
                 && level.getBlockState(pos).isFaceSturdy(level, pos, Direction.UP);
     }
 
-    Step buildNext(ServerLevel level) {
+    Step buildNext(ServerLevel level, List<ForestRanger> crew) {
         if (changes.size() == plan.size()) return Step.COMPLETE;
-        Placement placement = plan.get(changes.size());
-        BlockPos pos = origin.offset(placement.offset);
-        if (!replaceable(level, pos)) return Step.BLOCKED;
-        if (!placement.state.getCollisionShape(level, pos).isEmpty()
-                && !level.getEntitiesOfClass(LivingEntity.class, new AABB(pos), LivingEntity::isAlive).isEmpty()) {
-            return Step.OCCUPIED;
+        int start = changes.size();
+        BlockState first = plan.get(start).state;
+        boolean paired = (first.getBlock() instanceof BedBlock && first.getValue(BedBlock.PART) == BedPart.FOOT)
+                || (first.getBlock() instanceof DoorBlock && first.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER);
+        int end = start + (paired ? 2 : 1);
+        for (int index = start; index < end; index++) {
+            Placement placement = plan.get(index);
+            BlockPos pos = origin.offset(placement.offset);
+            if (!replaceable(level, pos)) return Step.BLOCKED;
+            if (!placement.state.getCollisionShape(level, pos).isEmpty()
+                    && !level.getEntitiesOfClass(LivingEntity.class, new AABB(pos),
+                    entity -> entity.isAlive() && !entity.isSpectator() && !crew.contains(entity)).isEmpty()) {
+                return Step.OCCUPIED;
+            }
         }
-        BlockState before = level.getBlockState(pos);
-        if (!level.setBlock(pos, placement.state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE)) return Step.BLOCKED;
-        changes.add(new Change(pos, before, placement.state));
-        if (pos.equals(origin.offset(SIGN)) && level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
-            ServiceSitePiece.writeSign(level, sign, new SignText()
-                    .setMessage(0, Component.literal("DEMOLISH CAMP"))
-                    .setMessage(1, Component.literal("Take your gear."))
-                    .setMessage(2, Component.literal("Pull when leaving."))
-                    .setMessage(3, Component.literal("Stand clear!")));
+        for (int index = start; index < end; index++) {
+            Placement placement = plan.get(index);
+            BlockPos pos = origin.offset(placement.offset);
+            BlockState before = level.getBlockState(pos);
+            if (!level.setBlock(pos, placement.state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE)) return Step.BLOCKED;
+            changes.add(new Change(pos, before, placement.state));
+            if (pos.equals(origin.offset(SIGN)) && level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
+                ServiceSitePiece.writeSign(level, sign, new SignText()
+                        .setMessage(0, Component.literal("DEMOLISH CAMP"))
+                        .setMessage(1, Component.literal("Take your gear."))
+                        .setMessage(2, Component.literal("Pull when leaving."))
+                        .setMessage(3, Component.literal("Stand clear!")));
+            }
         }
         if (changes.size() == plan.size()) {
             // Update the finished circuit only after the two charges and lever are in place.
@@ -170,24 +184,24 @@ final class RescueCamp {
         BlockState bed = Blocks.ORANGE_BED.defaultBlockState().setValue(BedBlock.FACING, Direction.NORTH);
         add(plan, -1, 0, 0, bed);
         add(plan, -1, 0, -1, bed.setValue(BedBlock.PART, BedPart.HEAD));
-        plan.add(new Placement(CHEST, Blocks.CHEST.defaultBlockState().setValue(net.minecraft.world.level.block.ChestBlock.FACING, Direction.SOUTH)));
+        plan.add(new Placement(CHEST, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST)));
         add(plan, 1, 0, 0, Blocks.CRAFTING_TABLE.defaultBlockState());
-        add(plan, 1, 0, 1, Blocks.FURNACE.defaultBlockState());
+        add(plan, 1, 0, 1, Blocks.FURNACE.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, Direction.WEST));
         add(plan, -1, 0, 1, Blocks.LANTERN.defaultBlockState());
         add(plan, -3, 0, 2, Blocks.LANTERN.defaultBlockState());
         add(plan, 3, 0, 2, Blocks.LANTERN.defaultBlockState());
         plan.add(new Placement(SIGN, Blocks.SPRUCE_SIGN.defaultBlockState()));
         add(plan, -2, 0, 2, Blocks.TNT.defaultBlockState());
         add(plan, 2, 0, 2, Blocks.TNT.defaultBlockState());
+        add(plan, -2, 0, 3, Blocks.TARGET.defaultBlockState());
+        add(plan, 2, 0, 3, Blocks.TARGET.defaultBlockState());
         BlockState wire = Blocks.REDSTONE_WIRE.defaultBlockState();
         for (int x = -2; x <= 2; x++) {
-            add(plan, x, 0, 3, wire.setValue(RedStoneWireBlock.EAST, x < 2 ? RedstoneSide.SIDE : RedstoneSide.NONE)
+            add(plan, x, 0, 4, wire.setValue(RedStoneWireBlock.EAST, x < 2 ? RedstoneSide.SIDE : RedstoneSide.NONE)
                     .setValue(RedStoneWireBlock.WEST, x > -2 ? RedstoneSide.SIDE : RedstoneSide.NONE)
                     .setValue(RedStoneWireBlock.NORTH, Math.abs(x) == 2 ? RedstoneSide.SIDE : RedstoneSide.NONE)
                     .setValue(RedStoneWireBlock.SOUTH, x == 0 ? RedstoneSide.SIDE : RedstoneSide.NONE));
         }
-        add(plan, 0, 0, 4, wire.setValue(RedStoneWireBlock.NORTH, RedstoneSide.SIDE)
-                .setValue(RedStoneWireBlock.SOUTH, RedstoneSide.SIDE));
         add(plan, 0, 0, 5, Blocks.LEVER.defaultBlockState().setValue(LeverBlock.FACE, AttachFace.FLOOR));
         return List.copyOf(plan);
     }

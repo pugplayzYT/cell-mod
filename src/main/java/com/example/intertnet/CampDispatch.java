@@ -201,8 +201,8 @@ final class CampDispatch {
             level = quote.level;
             site = quote.site;
             station = new ChunkPos(quote.station);
-            BlockPos approach = site.offset(0, 0, 4);
-            BlockPos ground = ServiceTrip.safeSurface(level, approach, 2, 2);
+            BlockPos approach = site.offset(0, 0, 8);
+            BlockPos ground = ServiceTrip.safeSurface(level, approach, 1, 2);
             arrival = ground == null ? approach : ground;
             camp = new RescueCamp(site);
             deadline = level.getGameTime() + 600;
@@ -219,14 +219,14 @@ final class CampDispatch {
             }
             if (phase == Phase.BUILDING) {
                 if (level.getGameTime() % 3 != 0) return true;
-                switch (camp.buildNext(level)) {
+                switch (camp.buildNext(level, crew)) {
                     case BLOCKED -> {
                         failure = "Something blocked the camp construction.";
                         return false;
                     }
                     case OCCUPIED -> {
                         if (level.getGameTime() % 60 == 0) {
-                            owner.displayClientMessage(Component.literal("Step clear of the camp so the crew can build."), true);
+                            owner.displayClientMessage(Component.literal("A player or mob is in the camp build area."), true);
                         }
                     }
                     case COMPLETE -> {
