@@ -12,14 +12,22 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
+import static com.example.intertnet.CellTowerBlockEntity.ANTENNA_SLOT;
+import static com.example.intertnet.CellTowerBlockEntity.FUEL_SLOT;
+import static com.example.intertnet.CellTowerBlockEntity.SLOT_COUNT;
+
 public class CellTowerMenu extends AbstractContainerMenu {
+    private static final int HOTBAR_START = SLOT_COUNT + 27;
+    private static final int INVENTORY_END = HOTBAR_START + 9;
+    static final int ANTENNA_X = 26;
+    static final int ANTENNA_Y = 69;
     private final Container container;
     private final ContainerData data;
     private final BlockPos towerPos;
-    private boolean fuelSlotVisible = true;
+    private boolean equipmentSlotsVisible = true;
 
     public CellTowerMenu(int containerId, Inventory playerInventory, FriendlyByteBuf extraData) {
-        this(containerId, playerInventory, new SimpleContainer(1), new SimpleContainerData(5), extraData);
+        this(containerId, playerInventory, new SimpleContainer(SLOT_COUNT), new SimpleContainerData(5), extraData);
     }
 
     private CellTowerMenu(int containerId, Inventory playerInventory, Container container, ContainerData data, FriendlyByteBuf extraData) {
@@ -42,7 +50,7 @@ public class CellTowerMenu extends AbstractContainerMenu {
 
     private void setupSlots(Inventory playerInventory) {
         // Tower Fuel Slot at (26, 52)
-        this.addSlot(new Slot(this.container, 0, 26, 52) {
+        this.addSlot(new Slot(this.container, FUEL_SLOT, 26, 52) {
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return CellTowerBlockEntity.getFuelSpec(stack, CellTowerMenu.this.isSatelliteConnector()) != null;
@@ -50,7 +58,18 @@ public class CellTowerMenu extends AbstractContainerMenu {
 
             @Override
             public boolean isActive() {
-                return CellTowerMenu.this.fuelSlotVisible;
+                return CellTowerMenu.this.equipmentSlotsVisible;
+            }
+        });
+        this.addSlot(new Slot(this.container, ANTENNA_SLOT, ANTENNA_X, ANTENNA_Y) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return !CellTowerMenu.this.isSatelliteConnector() && stack.getItem() instanceof AntennaItem;
+            }
+
+            @Override
+            public boolean isActive() {
+                return CellTowerMenu.this.equipmentSlotsVisible && !CellTowerMenu.this.isSatelliteConnector();
             }
         });
 
@@ -71,8 +90,12 @@ public class CellTowerMenu extends AbstractContainerMenu {
         return this.towerPos;
     }
 
-    public void setFuelSlotVisible(boolean visible) {
-        this.fuelSlotVisible = visible;
+    public void setEquipmentSlotsVisible(boolean visible) {
+        this.equipmentSlotsVisible = visible;
+    }
+
+    int getAntennaBonus() {
+        return AntennaItem.rangeBonus(this.getSlot(ANTENNA_SLOT).getItem());
     }
 
     public int getFuelRemaining() {
@@ -102,20 +125,22 @@ public class CellTowerMenu extends AbstractContainerMenu {
         if (slot != null && slot.hasItem()) {
             ItemStack itemstack1 = slot.getItem();
             itemstack = itemstack1.copy();
-            if (index == 0) {
-                if (!this.moveItemStackTo(itemstack1, 1, 37, true)) {
+            if (index < SLOT_COUNT) {
+                if (!slot.isActive() || !this.moveItemStackTo(itemstack1, SLOT_COUNT, INVENTORY_END, true)) {
                     return ItemStack.EMPTY;
                 }
             } else {
-                if (CellTowerBlockEntity.getFuelSpec(itemstack1, this.isSatelliteConnector()) != null) {
-                    if (!this.moveItemStackTo(itemstack1, 0, 1, false)) {
+                int equipmentSlot = itemstack1.getItem() instanceof AntennaItem ? ANTENNA_SLOT : FUEL_SLOT;
+                Slot target = this.getSlot(equipmentSlot);
+                if (target.isActive() && target.mayPlace(itemstack1)) {
+                    if (!this.moveItemStackTo(itemstack1, equipmentSlot, equipmentSlot + 1, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (index >= 1 && index < 28) {
-                    if (!this.moveItemStackTo(itemstack1, 28, 37, false)) {
+                } else if (index < HOTBAR_START) {
+                    if (!this.moveItemStackTo(itemstack1, HOTBAR_START, INVENTORY_END, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (index >= 28 && index < 37 && !this.moveItemStackTo(itemstack1, 1, 28, false)) {
+                } else if (!this.moveItemStackTo(itemstack1, SLOT_COUNT, HOTBAR_START, false)) {
                     return ItemStack.EMPTY;
                 }
             }

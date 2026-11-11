@@ -85,6 +85,9 @@ public class IntertnetMod {
                     .lightLevel(state -> state.getValue(CellTowerBlock.POWERED) ? 9 : 0)));
 
     public static final DeferredItem<BlockItem> CELL_TOWER_ITEM = ITEMS.registerSimpleBlockItem("cell_tower", CELL_TOWER_BLOCK);
+    static final DeferredItem<AntennaItem> LOW_ANTENNA = ITEMS.register("low_antenna", () -> new AntennaItem(32));
+    static final DeferredItem<AntennaItem> MEDIUM_ANTENNA = ITEMS.register("medium_antenna", () -> new AntennaItem(80));
+    static final DeferredItem<AntennaItem> HIGH_ANTENNA = ITEMS.register("high_antenna", () -> new AntennaItem(160));
 
     public static final DeferredBlock<Block> SATELLITE_CONNECTOR_BLOCK = BLOCKS.register("satellite_connector",
             () -> new SatelliteConnectorBlock(BlockBehaviour.Properties.of()
@@ -119,6 +122,9 @@ public class IntertnetMod {
                         output.accept(new ItemStack(SIM_CARD_ITEM.get()));
                         output.accept(SATELLITE_CONNECTOR_ITEM.get());
                         output.accept(CELL_TOWER_ITEM.get());
+                        output.accept(LOW_ANTENNA.get());
+                        output.accept(MEDIUM_ANTENNA.get());
+                        output.accept(HIGH_ANTENNA.get());
                         output.accept(GuidebookHelper.createSignedGuidebook());
                     }).build());
 
@@ -225,6 +231,10 @@ public class IntertnetMod {
     private static class ClientRegistrar {
         static void register(IEventBus modEventBus) {
             modEventBus.addListener(ClientRegistrar::onRegisterMenuScreens);
+            modEventBus.addListener((net.neoforged.neoforge.client.event.RegisterColorHandlersEvent.Item event) -> {
+                event.register((stack, layer) -> 0xFFFFBB82, LOW_ANTENNA.get());
+                event.register((stack, layer) -> 0xFF91E9FF, HIGH_ANTENNA.get());
+            });
             modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) ->
                     event.registerEntityRenderer(DINING_SEAT.get(), net.minecraft.client.renderer.entity.NoopRenderer::new));
             NeoForge.EVENT_BUS.addListener(CellTowerDebugRenderer::onRenderLevelStage);

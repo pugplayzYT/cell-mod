@@ -34,9 +34,7 @@ public class GuidebookHelper {
 
                 page(Component.literal("3. Cell Towers\n")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
-                        .append(Component.literal("\nPhones need a fueled Cell Tower in range.\n\n• ").withStyle(ChatFormatting.BLACK))
-                        .append(Component.literal("Craft: ").withStyle(ChatFormatting.BOLD))
-                        .append(Component.literal("Cobblestone, Iron Ingots, Iron Bars & Redstone Torch.\n\nRight-click a placed Tower to add fuel.").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal("\nPick up iron bars to learn the Cell Tower recipe.\n\nRight-click your tower to add fuel. Put an antenna in the lower slot for more range. Public towers have a high tier antenna built in.").withStyle(ChatFormatting.BLACK))),
 
                 page(Component.literal("4. SIM Cards!\n")
                         .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)

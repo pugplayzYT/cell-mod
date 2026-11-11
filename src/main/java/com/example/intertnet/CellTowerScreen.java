@@ -69,7 +69,7 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
         if (isSat) {
             this.viewMode = 0;
         }
-        this.menu.setFuelSlotVisible(this.viewMode == 0);
+        this.menu.setEquipmentSlotsVisible(this.viewMode == 0);
         if (this.openTowersBtn != null) {
             this.openTowersBtn.visible = !isSat;
         }
@@ -154,10 +154,18 @@ public class CellTowerScreen extends AbstractContainerScreen<CellTowerMenu> {
             g.drawString(this.font, isSat ? "Cu" : "Fuel", x + 23, y + 36, 0xFF94A3B8, false);
             g.drawString(this.font, statusText, barX, y + 32, statusCol, false);
             g.drawString(this.font, "Reserve: " + fuelRem + " / " + (fuelRem > 0 ? fuelMax : 0) + "u", barX, y + 43, 0xFFCBD5E1, false);
-            String fuelHint = isSat
-                    ? "Copper Only • Portable 64m"
-                    : "Au:96m Em:128m Dia:192m Net:256m";
-            g.drawString(this.font, fuelHint, barX, y + 67, 0xFF64748B, false);
+            if (isSat) {
+                g.drawString(this.font, "Copper Only • Portable 64m", barX, y + 67, 0xFF64748B, false);
+            } else {
+                int antennaX = x + CellTowerMenu.ANTENNA_X - 1;
+                int antennaY = y + CellTowerMenu.ANTENNA_Y - 1;
+                g.fill(antennaX, antennaY, antennaX + 18, antennaY + 18, 0xFF090D16);
+                g.renderOutline(antennaX, antennaY, 18, 18, 0xFF475569);
+                int bonus = this.menu.getAntennaBonus();
+                Component antenna = bonus > 0 ? Component.translatable("gui.intertnet.antenna.boost", bonus)
+                        : Component.translatable("gui.intertnet.antenna.empty");
+                g.drawString(this.font, antenna, barX, y + 67, bonus > 0 ? 0xFF38BDF8 : 0xFF94A3B8, false);
+            }
             g.blit(SIM_ICON, barX, y + 76, 0, 0, 9, 9, 9, 9);
             g.drawString(this.font, "SIM Net: " + netId, barX + 12, y + 77, 0xFF38BDF8, false);
         } else {

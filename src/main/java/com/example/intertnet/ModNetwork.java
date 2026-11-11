@@ -236,7 +236,7 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("7");
+        final PayloadRegistrar registrar = event.registrar("8");
         registrar.playToServer(ServiceRequestPayload.TYPE, ServiceRequestPayload.STREAM_CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {

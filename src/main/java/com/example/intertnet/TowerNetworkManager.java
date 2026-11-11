@@ -24,7 +24,7 @@ public class TowerNetworkManager {
             if (srcTower.isSatelliteConnector() || srcTower.isPublicTower()) {
                 return List.of();
             }
-            radius = Math.max(128, srcTower.getConfiguredRange());
+            radius = srcTower.getLinkRange();
         }
         double maxDistSqr = (double) radius * (double) radius;
         List<CellTowerBlockEntity> result = new ArrayList<>();

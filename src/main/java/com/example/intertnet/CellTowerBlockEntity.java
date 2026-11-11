@@ -38,7 +38,10 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     private static final Map<ResourceKey<Level>, Set<BlockPos>> LOADED_TOWERS_SERVER = new ConcurrentHashMap<>();
     private static final Map<ResourceKey<Level>, Set<BlockPos>> LOADED_TOWERS_CLIENT = new ConcurrentHashMap<>();
 
-    private final NonNullList<ItemStack> items = NonNullList.withSize(1, ItemStack.EMPTY);
+    static final int FUEL_SLOT = 0;
+    static final int ANTENNA_SLOT = 1;
+    static final int SLOT_COUNT = 2;
+    private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private int fuelRemaining = 0;
     private int fuelMax = 0;
     private int activeRange = 64;
@@ -58,7 +61,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
             return switch (index) {
                 case 0 -> fuelRemaining;
                 case 1 -> fuelMax;
-                case 2 -> isSatelliteConnector() ? 64 : activeRange;
+                case 2 -> getConfiguredRange();
                 case 3 -> hasFreeSimAvailable() ? 1 : 0;
                 case 4 -> isSatelliteConnector() ? 1 : 0;
                 default -> 0;
@@ -372,12 +375,18 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
     }
 
     public int getActiveRange() {
-        if (!isPowered()) return 0;
-        return isSatelliteConnector() ? 64 : this.activeRange;
+        return isPowered() ? getConfiguredRange() : 0;
     }
 
     public int getConfiguredRange() {
-        return isSatelliteConnector() ? 64 : Math.max(64, this.activeRange);
+        if (isSatelliteConnector()) return 64;
+        int antennaBonus = isPublicTower() ? IntertnetMod.HIGH_ANTENNA.get().rangeBonus()
+                : AntennaItem.rangeBonus(items.get(ANTENNA_SLOT));
+        return Math.max(64, this.activeRange) + antennaBonus;
+    }
+
+    int getLinkRange() {
+        return Math.max(128, this.activeRange);
     }
 
     public String getNetworkUid() {
@@ -526,7 +535,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
 
     @Override
     public boolean isEmpty() {
-        return this.items.get(0).isEmpty();
+        return this.items.get(FUEL_SLOT).isEmpty() && this.items.get(ANTENNA_SLOT).isEmpty();
     }
 
     @Override
@@ -559,7 +568,10 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
 
     @Override
     public boolean canPlaceItem(int index, ItemStack stack) {
-        return getFuelSpec(stack, isSatelliteConnector()) != null;
+        if (index == ANTENNA_SLOT) {
+            return !isSatelliteConnector() && !isPublicTower() && stack.getItem() instanceof AntennaItem;
+        }
+        return index == FUEL_SLOT && getFuelSpec(stack, isSatelliteConnector()) != null;
     }
 
     @Override
