@@ -38,17 +38,19 @@ final class HotelPiece extends StructurePiece {
     static final int DEPTH = 6;
     static final int ENTRY = -1;
     static final int EXIT = -2;
+    private static final int CURRENT_LAYOUT = 2;
+    private static final BlockPos WILD_CHECKOUT = new BlockPos(6, 0, 6);
     static final BlockPos WIFI = new BlockPos(7, 1, 2);
     static final List<BlockPos> ROOM_DOORS = List.of(new BlockPos(5, 1, 4), new BlockPos(10, 1, 4),
             new BlockPos(5, 1, 9), new BlockPos(10, 1, 9));
     private final boolean wild;
     private boolean staffed;
-    private boolean repairedLayout;
+    private int layoutVersion;
 
     HotelPiece(int x, int y, int z, boolean wild) {
         super(IntertnetMod.HOTEL_PIECE.get(), 0, new BoundingBox(x, y, z, x + 15, y + (wild ? 11 : 6), z + 15));
         this.wild = wild;
-        repairedLayout = true;
+        layoutVersion = CURRENT_LAYOUT;
         setOrientation(Direction.SOUTH);
     }
 
@@ -56,7 +58,8 @@ final class HotelPiece extends StructurePiece {
         super(IntertnetMod.HOTEL_PIECE.get(), tag);
         wild = tag.getBoolean("Wild");
         staffed = tag.getBoolean("Staffed");
-        repairedLayout = tag.getBoolean("RepairedLayout");
+        layoutVersion = tag.contains("LayoutVersion") ? tag.getInt("LayoutVersion")
+                : tag.getBoolean("RepairedLayout") ? 1 : 0;
     }
 
     boolean isWild() {
@@ -69,7 +72,7 @@ final class HotelPiece extends StructurePiece {
 
     static BlockPos reader(boolean wild, int role) {
         if (role == ENTRY) return entrance(wild).east();
-        if (role == EXIT) return wild ? new BlockPos(6, 1, 6) : new BlockPos(7, 1, 12);
+        if (role == EXIT) return wild ? WILD_CHECKOUT : new BlockPos(7, 1, 12);
         return ROOM_DOORS.get(role).south();
     }
 
@@ -77,7 +80,7 @@ final class HotelPiece extends StructurePiece {
     protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag) {
         tag.putBoolean("Wild", wild);
         tag.putBoolean("Staffed", staffed);
-        tag.putBoolean("RepairedLayout", repairedLayout);
+        tag.putInt("LayoutVersion", layoutVersion);
     }
 
     @Override
@@ -115,7 +118,8 @@ final class HotelPiece extends StructurePiece {
                     .setValue(BedBlock.FACING, Direction.SOUTH);
             placeBlock(level, bed, x, 1, z, box);
             placeBlock(level, bed.setValue(BedBlock.PART, BedPart.HEAD), x, 1, z - 1, box);
-            put(level, box, x, 1, z + 1, Blocks.CRAFTING_TABLE);
+            put(level, box, x, 1, z + 2, Blocks.CRAFTING_TABLE);
+            if (z == 9) fill(level, box, left ? 2 : 11, 1, 12, left ? 4 : 13, 3, 12, wall);
             placeBlock(level, facing(Blocks.BLAST_FURNACE, Direction.SOUTH), left ? 3 : 12, 1, z + 2, box);
             placeBlock(level, facing(Blocks.FURNACE, Direction.SOUTH), left ? 4 : 11, 1, z + 2, box);
             put(level, box, left ? 4 : 11, 1, z - 1, Blocks.LANTERN);
@@ -128,9 +132,7 @@ final class HotelPiece extends StructurePiece {
                 tower.setNetworkUid(HotelAccess.wifiNetwork(getWorldPos(0, 0, 0)));
                 tower.setItem(CellTowerBlockEntity.FUEL_SLOT, new ItemStack(Items.COPPER_INGOT, 16));
             }
-            for (int x = 7; x <= 8; x++) {
-                for (int z = 7; z <= 12; z++) buildStairColumn(level, box, x, z);
-            }
+            buildWildStaircase(level, box);
             lightCheckout(level, box);
         }
         for (int x = 4; x <= 11; x++) {
@@ -164,6 +166,7 @@ final class HotelPiece extends StructurePiece {
                 staffed = true;
             }
         }
+        layoutVersion = CURRENT_LAYOUT;
     }
 
     private void reader(WorldGenLevel level, BoundingBox box, int role, String label) {
@@ -184,12 +187,22 @@ final class HotelPiece extends StructurePiece {
         }
     }
 
-    private void buildStairColumn(WorldGenLevel level, BoundingBox box, int x, int z) {
-        int y = z - 6;
-        fill(level, box, x, 0, z, x, y - 1, z, Blocks.STONE_BRICKS);
-        generateAirBox(level, box, x, y + 1, z, x, y + 3, z);
-        placeBlock(level, Blocks.STONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH),
-                x, y, z, box);
+    private void buildWildStaircase(WorldGenLevel level, BoundingBox box) {
+        BlockState stairs = Blocks.STONE_BRICK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
+        fill(level, box, 7, 0, 7, 9, 0, 12, Blocks.STONE_BRICKS);
+        // The lower hallway crosses beneath the upper flight to reach the rear rooms.
+        fill(level, box, 7, 1, 8, 9, 1, 8, Blocks.STONE_BRICKS);
+        for (int z = 7; z <= 12; z++) {
+            int y = z - 6;
+            if (z >= 10) fill(level, box, 7, 3, z, 9, y - 1, z, Blocks.STONE_BRICKS);
+            generateAirBox(level, box, 7, y + 1, z, 9, z == 7 ? 4 : 9, z);
+            for (int x = 7; x <= 9; x++) placeBlock(level, stairs, x, y, z, box);
+        }
+        fill(level, box, 6, 5, 7, 6, 9, 12, Blocks.DARK_OAK_PLANKS);
+        fill(level, box, 10, 5, 7, 10, 9, 12, Blocks.DARK_OAK_PLANKS);
+        fill(level, box, 7, 5, 7, 9, 9, 7, Blocks.DARK_OAK_PLANKS);
+        fill(level, box, 6, 10, 7, 10, 10, 12, Blocks.DARK_OAK_SLAB);
+        placeBlock(level, Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true), 8, 9, 9, box);
     }
 
     private void lightCheckout(WorldGenLevel level, BoundingBox box) {
@@ -205,8 +218,19 @@ final class HotelPiece extends StructurePiece {
     }
 
     boolean repairLayout(ServerLevel level) {
-        if (repairedLayout) return false;
+        if (layoutVersion >= CURRENT_LAYOUT) return false;
         BoundingBox box = getBoundingBox();
+        if (layoutVersion == 0) repairOriginalLayout(level, box);
+        repairWorkstations(level, box);
+        if (wild) {
+            repairWildStairs(level, box);
+            moveCheckout(level, box);
+        }
+        layoutVersion = CURRENT_LAYOUT;
+        return true;
+    }
+
+    private void repairOriginalLayout(ServerLevel level, BoundingBox box) {
         for (int role = 0; role < ROOM_DOORS.size(); role++) {
             BlockPos door = ROOM_DOORS.get(role);
             boolean left = door.getX() == 5;
@@ -224,11 +248,6 @@ final class HotelPiece extends StructurePiece {
         if (wild) {
             for (int z = 7; z <= 12; z++) {
                 int oldStepY = z - 7;
-                for (int x = 7; x <= 8; x++) {
-                    if (level.getBlockState(getWorldPos(x, oldStepY, z)).is(Blocks.STONE_BRICK_STAIRS)) {
-                        buildStairColumn(level, box, x, z);
-                    }
-                }
                 for (int x : new int[]{6, 9}) {
                     BlockPos cap = getWorldPos(x, oldStepY + 3, z);
                     if (level.getBlockState(cap).is(Blocks.DARK_OAK_PLANKS)) {
@@ -241,8 +260,57 @@ final class HotelPiece extends StructurePiece {
             if (level.getBlockState(oldLight).is(Blocks.LANTERN)) level.removeBlock(oldLight, false);
             if (level.isEmptyBlock(getWorldPos(6, 3, 6))) lightCheckout(level, box);
         }
-        repairedLayout = true;
-        return true;
+    }
+
+    private void repairWorkstations(ServerLevel level, BoundingBox box) {
+        Block wall = wild ? Blocks.MOSSY_STONE_BRICKS : Blocks.STRIPPED_OAK_WOOD;
+        for (BlockPos door : ROOM_DOORS) {
+            boolean left = door.getX() == 5;
+            int x = left ? 2 : 13;
+            int z = door.getZ();
+            BlockPos oldTable = getWorldPos(x, 1, z + 1);
+            if (level.getBlockState(oldTable).is(Blocks.CRAFTING_TABLE) && level.isEmptyBlock(getWorldPos(x, 1, z + 2))) {
+                put(level, box, x, 1, z + 2, Blocks.CRAFTING_TABLE);
+                level.removeBlock(oldTable, false);
+            }
+            if (z != 9) continue;
+            for (int backX = left ? 2 : 11; backX <= (left ? 4 : 13); backX++) {
+                for (int y = 1; y <= 3; y++) {
+                    if (level.isEmptyBlock(getWorldPos(backX, y, 12))) put(level, box, backX, y, 12, wall);
+                }
+            }
+        }
+    }
+
+    private void repairWildStairs(ServerLevel level, BoundingBox box) {
+        for (int x = 7; x <= 8; x++) {
+            for (int z = 9; z <= 12; z++) {
+                for (int y = 1; y <= 2; y++) {
+                    BlockPos pos = getWorldPos(x, y, z);
+                    BlockState state = level.getBlockState(pos);
+                    if (state.is(Blocks.STONE_BRICKS) || state.is(Blocks.STONE_BRICK_STAIRS)) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                    }
+                }
+            }
+        }
+        buildWildStaircase(level, box);
+    }
+
+    private void moveCheckout(ServerLevel level, BoundingBox box) {
+        BlockPos oldHopper = world(WILD_CHECKOUT.above());
+        if (!(level.getBlockEntity(oldHopper) instanceof HopperBlockEntity oldReader)) return;
+        BlockPos floor = world(WILD_CHECKOUT);
+        if (!level.getBlockState(floor).is(Blocks.STONE_BRICKS) && !level.isEmptyBlock(floor)) return;
+        level.setBlock(floor, Blocks.HOPPER.defaultBlockState(), Block.UPDATE_CLIENTS);
+        if (!(level.getBlockEntity(floor) instanceof HopperBlockEntity newReader)) return;
+        HotelAccess.markReader(newReader, getWorldPos(0, 0, 0), true, EXIT);
+        for (int slot = 0; slot < oldReader.getContainerSize(); slot++) {
+            newReader.setItem(slot, oldReader.removeItemNoUpdate(slot));
+        }
+        newReader.setChanged();
+        if (level.getBlockState(oldHopper.above()).is(Blocks.SPRUCE_WALL_SIGN)) level.removeBlock(oldHopper.above(), false);
+        wallSign(level, box, WILD_CHECKOUT.above(), Direction.EAST, "Checkout", "Pass ends stay");
     }
 
     private void turnFurnace(ServerLevel level, BlockPos offset, Block block) {
