@@ -38,7 +38,7 @@ final class HotelPiece extends StructurePiece {
     static final int DEPTH = 6;
     static final int ENTRY = -1;
     static final int EXIT = -2;
-    private static final int CURRENT_LAYOUT = 2;
+    private static final int CURRENT_LAYOUT = 3;
     private static final BlockPos WILD_CHECKOUT = new BlockPos(6, 0, 6);
     static final BlockPos WIFI = new BlockPos(7, 1, 2);
     static final List<BlockPos> ROOM_DOORS = List.of(new BlockPos(5, 1, 4), new BlockPos(10, 1, 4),
@@ -118,6 +118,7 @@ final class HotelPiece extends StructurePiece {
                     .setValue(BedBlock.FACING, Direction.SOUTH);
             placeBlock(level, bed, x, 1, z, box);
             placeBlock(level, bed.setValue(BedBlock.PART, BedPart.HEAD), x, 1, z - 1, box);
+            if (z == 4) put(level, box, x, 1, z - 2, wall);
             put(level, box, x, 1, z + 2, Blocks.CRAFTING_TABLE);
             if (z == 9) fill(level, box, left ? 2 : 11, 1, 12, left ? 4 : 13, 3, 12, wall);
             placeBlock(level, facing(Blocks.BLAST_FURNACE, Direction.SOUTH), left ? 3 : 12, 1, z + 2, box);
@@ -142,15 +143,20 @@ final class HotelPiece extends StructurePiece {
         }
         fill(level, box, 4, surface, 13, 11, surface, 15, floor);
         generateAirBox(level, box, 4, surface + 1, 13, 11, surface + 3, 15);
-        fill(level, box, 4, surface + 4, 11, 11, surface + 4, 14, Blocks.DARK_OAK_SLAB);
-        fill(level, box, 4, surface + 1, 13, 4, surface + 3, 14, Blocks.DARK_OAK_LOG);
-        fill(level, box, 11, surface + 1, 13, 11, surface + 3, 14, Blocks.DARK_OAK_LOG);
-        fill(level, box, 4, surface + 1, 13, 11, surface + 3, 13, wild ? Blocks.DARK_OAK_PLANKS : wall);
-        put(level, box, 6, surface + 2, 13, Blocks.GLASS);
+        if (wild) {
+            fill(level, box, 6, surface + 1, 13, 10, surface + 3, 13, Blocks.DARK_OAK_PLANKS);
+            fill(level, box, 6, surface + 4, 13, 10, surface + 4, 13, Blocks.DARK_OAK_SLAB);
+        } else {
+            fill(level, box, 4, surface + 4, 11, 11, surface + 4, 14, Blocks.DARK_OAK_SLAB);
+            fill(level, box, 4, surface + 1, 13, 4, surface + 3, 14, Blocks.DARK_OAK_LOG);
+            fill(level, box, 11, surface + 1, 13, 11, surface + 3, 14, Blocks.DARK_OAK_LOG);
+            fill(level, box, 4, surface + 1, 13, 11, surface + 3, 13, wall);
+        }
+        put(level, box, wild ? 7 : 6, surface + 2, 13, Blocks.GLASS);
         door(level, box, entrance(wild), Direction.NORTH);
         reader(level, box, ENTRY, "Insert hotel pass");
         reader(level, box, EXIT, "Checkout");
-        sign(level, box, new BlockPos(10, surface + 1, 14), wild ? "WILD HOTEL" : "PLAINS HOTEL", "Room: 3 emeralds");
+        entranceSign(level, box, surface);
         put(level, box, 4, surface + 1, 15, Blocks.LANTERN);
         put(level, box, 11, surface + 1, 15, Blocks.LANTERN);
         if (!staffed) {
@@ -221,13 +227,51 @@ final class HotelPiece extends StructurePiece {
         if (layoutVersion >= CURRENT_LAYOUT) return false;
         BoundingBox box = getBoundingBox();
         if (layoutVersion == 0) repairOriginalLayout(level, box);
-        repairWorkstations(level, box);
-        if (wild) {
-            repairWildStairs(level, box);
-            moveCheckout(level, box);
+        if (layoutVersion < 2) {
+            repairWorkstations(level, box);
+            if (wild) {
+                repairWildStairs(level, box);
+                moveCheckout(level, box);
+            }
+        }
+        repairExterior(level, box);
+        for (int x : new int[]{2, 13}) {
+            if (level.getBlockState(getWorldPos(x, 1, 3)).getBlock() instanceof BedBlock
+                    && level.isEmptyBlock(getWorldPos(x, 1, 2))) {
+                put(level, box, x, 1, 2, wild ? Blocks.MOSSY_STONE_BRICKS : Blocks.STRIPPED_OAK_WOOD);
+            }
         }
         layoutVersion = CURRENT_LAYOUT;
         return true;
+    }
+
+    private void repairExterior(ServerLevel level, BoundingBox box) {
+        int surface = wild ? DEPTH : 0;
+        BlockPos oldSign = getWorldPos(10, surface + 1, 14);
+        if (level.getBlockState(oldSign).is(Blocks.SPRUCE_SIGN) && level.isEmptyBlock(oldSign.above())) {
+            level.removeBlock(oldSign, false);
+            entranceSign(level, box, surface);
+        }
+        if (!wild) return;
+        if (level.getBlockState(getWorldPos(6, surface + 2, 13)).is(Blocks.GLASS)
+                && level.getBlockState(getWorldPos(7, surface + 2, 13)).is(Blocks.DARK_OAK_PLANKS)) {
+            put(level, box, 6, surface + 2, 13, Blocks.DARK_OAK_PLANKS);
+            put(level, box, 7, surface + 2, 13, Blocks.GLASS);
+        }
+        for (int x = 4; x <= 11; x++) {
+            removeExteriorBlock(level, x, surface + 4, 14, Blocks.DARK_OAK_SLAB);
+            if (x >= 6 && x <= 10) continue;
+            for (int z = 11; z <= 13; z++) removeExteriorBlock(level, x, surface + 4, z, Blocks.DARK_OAK_SLAB);
+            for (int y = surface + 1; y <= surface + 3; y++) {
+                removeExteriorBlock(level, x, y, 13, Blocks.DARK_OAK_PLANKS);
+                if (x == 4 || x == 11) removeExteriorBlock(level, x, y, 14, Blocks.DARK_OAK_LOG);
+            }
+        }
+    }
+
+    private void removeExteriorBlock(ServerLevel level, int x, int y, int z, Block block) {
+        BlockPos pos = getWorldPos(x, y, z);
+        if (level.getBlockState(pos).is(block)) level.removeBlock(pos, false);
     }
 
     private void repairOriginalLayout(ServerLevel level, BoundingBox box) {
@@ -321,9 +365,9 @@ final class HotelPiece extends StructurePiece {
         }
     }
 
-    private void sign(WorldGenLevel level, BoundingBox box, BlockPos offset, String first, String second) {
-        placeBlock(level, Blocks.SPRUCE_SIGN.defaultBlockState(), offset.getX(), offset.getY(), offset.getZ(), box);
-        writeSign(level, offset, first, second);
+    private void entranceSign(WorldGenLevel level, BoundingBox box, int surface) {
+        wallSign(level, box, new BlockPos(10, surface + 2, 14), Direction.NORTH,
+                wild ? "WILD HOTEL" : "PLAINS HOTEL", "Room: 3 emeralds");
     }
 
     private void wallSign(WorldGenLevel level, BoundingBox box, BlockPos offset, Direction facing, String first, String second) {

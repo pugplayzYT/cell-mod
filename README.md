@@ -13,7 +13,7 @@ Install JDK 21 and run the included Gradle wrapper.
 - Windows `.\gradlew.bat build`
 - Linux or macOS `./gradlew build`
 
-The build creates `build/libs/intertnet-1.0.8.jar`. Copy it into the mods folder of a Minecraft 1.21.1 NeoForge instance. For multiplayer, install the same build on the server and clients.
+The build creates `build/libs/intertnet-1.0.9.jar`. Copy it into the mods folder of a Minecraft 1.21.1 NeoForge instance. For multiplayer, install the same build on the server and clients.
 
 ## License
 
