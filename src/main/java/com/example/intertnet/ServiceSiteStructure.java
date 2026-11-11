@@ -63,7 +63,7 @@ final class ServiceSiteStructure extends Structure {
                 builder -> builder.addPiece(new ServiceSitePiece(x, y, z, restaurant, rooftop, emergency.orElse(null)))));
     }
 
-    private static boolean isReserved(GenerationContext context, String setName) {
+    static boolean isReserved(GenerationContext context, String setName) {
         var set = context.registryAccess().registryOrThrow(Registries.STRUCTURE_SET)
                 .get(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, setName));
         var chunk = context.chunkPos();

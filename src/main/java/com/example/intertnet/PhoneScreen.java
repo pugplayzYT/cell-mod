@@ -32,7 +32,7 @@ public class PhoneScreen extends Screen {
 
     private static final int PHONE_W = 218;
     private static final int PHONE_H = 207;
-    private static final String[] APPS = {"Messages", "SOS", "Delivery", "Rideshare"};
+    private static final String[] APPS = {"Texts", "SOS", "Delivery", "Rides", "Ranger"};
     private static final int TAB_GAP = 2;
     private static final int TAB_W = (PHONE_W - 10 - TAB_GAP * (APPS.length - 1)) / APPS.length;
 
@@ -349,6 +349,8 @@ public class PhoneScreen extends Screen {
                             this.messageInputBox.setFocused(true);
                         } else if (i == 1) {
                             Minecraft.getInstance().setScreen(new EmergencyScreen(this));
+                        } else if (i == 4) {
+                            Minecraft.getInstance().setScreen(new RangerScreen(this));
                         } else {
                             var mode = i == 2 ? TownServices.Mode.DELIVERY : TownServices.Mode.RIDESHARE;
                             Minecraft.getInstance().setScreen(new TownServiceScreen(mode, this, 0));

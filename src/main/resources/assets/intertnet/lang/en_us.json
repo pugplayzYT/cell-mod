@@ -7,6 +7,7 @@
   "item.intertnet.high_antenna": "High Tier Antenna",
   "item.intertnet.personal_satellite_antenna": "Personal Satellite Antenna",
   "block.intertnet.satellite_relay": "Global Satellite Relay",
+  "entity.intertnet.forest_ranger": "Forest Ranger",
   "tooltip.intertnet.antenna.range": "+%s blocks of signal range",
   "tooltip.intertnet.antenna.install": "Place in a personal Cell Tower's antenna slot",
   "gui.intertnet.antenna.boost": "Antenna: +%sm range",

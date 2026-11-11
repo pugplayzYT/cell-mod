@@ -20,8 +20,18 @@ public class ClientHooks {
     static void receiveServiceFeedback(ModNetwork.ServiceFeedbackPayload payload) {
         if (payload.mode() == ModNetwork.EMERGENCY_FEEDBACK && Minecraft.getInstance().screen instanceof EmergencyScreen screen) {
             screen.setFeedback(payload.message());
+        } else if (payload.mode() == ModNetwork.RANGER_FEEDBACK && Minecraft.getInstance().screen instanceof RangerScreen screen) {
+            screen.setFeedback(payload.message());
         } else if (Minecraft.getInstance().screen instanceof TownServiceScreen screen) {
             screen.setFeedback(payload);
         }
+    }
+
+    static void receiveRangerQuote(ModNetwork.RangerQuotePayload payload) {
+        if (Minecraft.getInstance().screen instanceof RangerScreen screen) screen.setQuote(payload);
+    }
+
+    static void openRangerMeeting(int entityId) {
+        Minecraft.getInstance().setScreen(new RangerScreen(entityId));
     }
 }

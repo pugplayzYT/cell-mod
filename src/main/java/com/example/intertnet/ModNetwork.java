@@ -26,6 +26,53 @@ import java.util.List;
 
 public class ModNetwork {
     static final int EMERGENCY_FEEDBACK = -1;
+    static final int RANGER_FEEDBACK = -2;
+
+    public record RangerCallPayload(boolean confirm) implements CustomPacketPayload {
+        static final Type<RangerCallPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "ranger_call"));
+        static final StreamCodec<FriendlyByteBuf, RangerCallPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.BOOL, RangerCallPayload::confirm, RangerCallPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record RangerQuotePayload(String message, int distance, int seconds, String pickup) implements CustomPacketPayload {
+        static final Type<RangerQuotePayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "ranger_quote"));
+        static final StreamCodec<FriendlyByteBuf, RangerQuotePayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.STRING_UTF8, RangerQuotePayload::message,
+                        ByteBufCodecs.VAR_INT, RangerQuotePayload::distance, ByteBufCodecs.VAR_INT, RangerQuotePayload::seconds,
+                        ByteBufCodecs.STRING_UTF8, RangerQuotePayload::pickup, RangerQuotePayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record RangerMeetPayload(int entityId) implements CustomPacketPayload {
+        static final Type<RangerMeetPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "ranger_meet"));
+        static final StreamCodec<FriendlyByteBuf, RangerMeetPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.VAR_INT, RangerMeetPayload::entityId, RangerMeetPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record RangerEscortPayload(int entityId) implements CustomPacketPayload {
+        static final Type<RangerEscortPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(IntertnetMod.MODID, "ranger_escort"));
+        static final StreamCodec<FriendlyByteBuf, RangerEscortPayload> STREAM_CODEC =
+                StreamCodec.composite(ByteBufCodecs.VAR_INT, RangerEscortPayload::entityId, RangerEscortPayload::new);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
 
     public record OrderSnapshot(
             String orderId,
@@ -282,7 +329,19 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("10");
+        final PayloadRegistrar registrar = event.registrar("11");
+        registrar.playToServer(RangerCallPayload.TYPE, RangerCallPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) RangerDispatch.request(player, payload.confirm());
+                }));
+        registrar.playToServer(RangerEscortPayload.TYPE, RangerEscortPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) RangerDispatch.escort(player, payload.entityId());
+                }));
+        registrar.playToClient(RangerQuotePayload.TYPE, RangerQuotePayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> ClientHooks.receiveRangerQuote(payload)));
+        registrar.playToClient(RangerMeetPayload.TYPE, RangerMeetPayload.STREAM_CODEC, (payload, context) ->
+                context.enqueueWork(() -> ClientHooks.openRangerMeeting(payload.entityId())));
         registrar.playToServer(TogglePhoneAntennaPayload.TYPE, TogglePhoneAntennaPayload.STREAM_CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) PersonalSatelliteAntennaItem.toggle(player);

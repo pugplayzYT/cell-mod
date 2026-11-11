@@ -1,0 +1,7 @@
+{
+  "type": "intertnet:ranger_lookout",
+  "biomes": "#intertnet:has_structure/ranger_lookout",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

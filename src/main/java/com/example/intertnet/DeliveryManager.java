@@ -162,6 +162,7 @@ public class DeliveryManager {
         List<ModNetwork.OrderSnapshot> orders = new ArrayList<>();
         TownServices.addTracking(player, orders);
         EmergencyDispatch.addTracking(player, orders);
+        RangerDispatch.addTracking(player, orders);
 
         List<ModNetwork.MessageSnapshot> messages = new ArrayList<>();
         List<String> peersOnNetwork = List.of();

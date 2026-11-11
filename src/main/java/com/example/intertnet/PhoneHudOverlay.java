@@ -74,7 +74,7 @@ public class PhoneHudOverlay {
 
         if (hasOrders) {
             ModNetwork.OrderSnapshot first = orders.get(0);
-            String ordLine = "🚕 " + first.status();
+            String ordLine = first.orderId().equals(RangerDispatch.ORDER_ID) ? first.status() : "🚕 " + first.status();
             g.drawString(mc.font, mc.font.plainSubstrByWidth(ordLine, boxW - 8), boxX + 4, boxY + 23, 0xFFFBBF24, false);
         }
     }

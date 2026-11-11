@@ -357,14 +357,24 @@ final class TownServices {
     }
 
     static BlockPos nearest(ServerLevel level, ResourceKey<Structure> key, BlockPos from, int radius) {
+        return nearest(level, key, from, radius, pos -> true);
+    }
+
+    static BlockPos nearest(ServerLevel level, ResourceKey<Structure> key, BlockPos from, int radius,
+                            java.util.function.Predicate<BlockPos> available) {
         var structure = level.registryAccess().registryOrThrow(Registries.STRUCTURE).getHolder(key);
         if (structure.isEmpty()) {
             return null;
         }
-        return nearest(level, HolderSet.direct(structure.get()), from, radius);
+        return nearest(level, HolderSet.direct(structure.get()), from, radius, available);
     }
 
     private static BlockPos nearest(ServerLevel level, HolderSet<Structure> targets, BlockPos from, int radius) {
+        return nearest(level, targets, from, radius, pos -> true);
+    }
+
+    private static BlockPos nearest(ServerLevel level, HolderSet<Structure> targets, BlockPos from, int radius,
+                                    java.util.function.Predicate<BlockPos> available) {
         var generatorState = level.getChunkSource().getGeneratorState();
         long seed = generatorState.getLevelSeed();
         List<SiteCandidate> candidates = new ArrayList<>();
@@ -385,7 +395,8 @@ final class TownServices {
                         double dx = pos.getX() - from.getX();
                         double dz = pos.getZ() - from.getZ();
                         double squared = dx * dx + dz * dz;
-                        if (squared <= (double) radius * radius && level.getWorldBorder().isWithinBounds(pos)) {
+                        if (squared <= (double) radius * radius && level.getWorldBorder().isWithinBounds(pos)
+                                && available.test(pos)) {
                             candidates.add(new SiteCandidate(target.value(), grid, chunk, pos, squared));
                         }
                     }

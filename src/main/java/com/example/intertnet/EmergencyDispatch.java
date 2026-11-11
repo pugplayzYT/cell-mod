@@ -203,8 +203,8 @@ final class EmergencyDispatch {
         return entity.getTags().contains(RESPONSE_TAG) && entity.getPersistentData().hasUUID(RESPONSE_ID);
     }
 
-    private static boolean isThreat(LivingEntity entity) {
-        return entity instanceof Enemy && !entity.getTags().contains(RESPONSE_TAG)
+    static boolean isThreat(LivingEntity entity) {
+        return entity instanceof Enemy && !(entity instanceof ForestRanger) && !entity.getTags().contains(RESPONSE_TAG)
                 && !entity.getTags().contains(TowerGuards.GUARD);
     }
 

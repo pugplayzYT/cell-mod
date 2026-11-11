@@ -1,0 +1,12 @@
+{
+  "structures": [
+    { "structure": "intertnet:ranger_lookout", "weight": 1 }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 12,
+    "separation": 5,
+    "salt": 93511724,
+    "locate_offset": [8, 0, 9]
+  }
+}

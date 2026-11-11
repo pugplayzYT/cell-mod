@@ -84,7 +84,11 @@ public class GuidebookHelper {
 
                 page(Component.literal("14. Global Satellite\n")
                         .withStyle(ChatFormatting.DARK_AQUA, ChatFormatting.BOLD)
-                        .append(Component.literal("\nBuy a phone antenna at an Open World stall for 20 emeralds. It has its own SIM.\n\nYour phone falls back to satellite in the Overworld with up to six blocks overhead.").withStyle(ChatFormatting.BLACK)))
+                        .append(Component.literal("\nBuy a phone antenna at an Open World stall for 20 emeralds. It has its own SIM.\n\nYour phone falls back to satellite in the Overworld with up to six blocks overhead.").withStyle(ChatFormatting.BLACK))),
+
+                page(Component.literal("15. Forest Ranger\n")
+                        .withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)
+                        .append(Component.literal("\nIn a forest, open Ranger with phone reception. A nearby lookout sends a ranger for 3 emeralds.\n\nMeet them outdoors, right-click, and follow them up to shelter.").withStyle(ChatFormatting.BLACK)))
         );
 
         WrittenBookContent content = new WrittenBookContent(

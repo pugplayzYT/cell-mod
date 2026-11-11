@@ -12,6 +12,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.npc.AbstractVillager;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Pillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
@@ -36,6 +38,7 @@ import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -66,6 +69,13 @@ public class IntertnetMod {
             STRUCTURES.register("service_site", () -> () -> ServiceSiteStructure.CODEC);
     static final DeferredHolder<StructurePieceType, StructurePieceType> SERVICE_SITE_PIECE =
             STRUCTURE_PIECES.register("service_site", () -> (StructurePieceType.ContextlessType) ServiceSitePiece::new);
+    static final DeferredHolder<StructureType<?>, StructureType<RangerLookoutStructure>> RANGER_LOOKOUT_STRUCTURE =
+            STRUCTURES.register("ranger_lookout", () -> () -> RangerLookoutStructure.CODEC);
+    static final DeferredHolder<StructurePieceType, StructurePieceType> RANGER_LOOKOUT_PIECE =
+            STRUCTURE_PIECES.register("ranger_lookout", () -> (StructurePieceType.ContextlessType) RangerLookoutPiece::new);
+    static final DeferredHolder<EntityType<?>, EntityType<ForestRanger>> FOREST_RANGER =
+            ENTITIES.register("forest_ranger", () -> EntityType.Builder.<ForestRanger>of(ForestRanger::new, MobCategory.MISC)
+                    .sized(0.6f, 1.95f).clientTrackingRange(8).build("intertnet:forest_ranger"));
     static final DeferredHolder<EntityType<?>, EntityType<DiningSeat>> DINING_SEAT =
             ENTITIES.register("dining_seat", () -> EntityType.Builder.<DiningSeat>of(DiningSeat::new, MobCategory.MISC)
                     .sized(0.75f, 0.45f).clientTrackingRange(6).build("intertnet:dining_seat"));
@@ -150,6 +160,8 @@ public class IntertnetMod {
         ENTITIES.register(modEventBus);
 
         modEventBus.addListener(ModNetwork::registerPayloads);
+        modEventBus.addListener((EntityAttributeCreationEvent event) ->
+                event.put(FOREST_RANGER.get(), Pillager.createAttributes().add(Attributes.FOLLOW_RANGE, 40).build()));
 
         NeoForge.EVENT_BUS.addListener(this::onEntityInteract);
         NeoForge.EVENT_BUS.addListener(this::onServerChat);
@@ -164,6 +176,7 @@ public class IntertnetMod {
         TownServices.register();
         TowerGuards.register();
         EmergencyDispatch.register();
+        RangerDispatch.register();
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             ClientRegistrar.register(modEventBus);
@@ -251,8 +264,10 @@ public class IntertnetMod {
                 event.register((stack, layer) -> 0xFFFFBB82, LOW_ANTENNA.get());
                 event.register((stack, layer) -> 0xFF91E9FF, HIGH_ANTENNA.get());
             });
-            modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) ->
-                    event.registerEntityRenderer(DINING_SEAT.get(), net.minecraft.client.renderer.entity.NoopRenderer::new));
+            modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) -> {
+                event.registerEntityRenderer(DINING_SEAT.get(), net.minecraft.client.renderer.entity.NoopRenderer::new);
+                event.registerEntityRenderer(FOREST_RANGER.get(), net.minecraft.client.renderer.entity.PillagerRenderer::new);
+            });
             NeoForge.EVENT_BUS.addListener(CellTowerDebugRenderer::onRenderLevelStage);
             NeoForge.EVENT_BUS.addListener(CellTowerDebugRenderer::onDebugText);
             NeoForge.EVENT_BUS.addListener(PhoneHudOverlay::onRenderGui);
