@@ -1,0 +1,19 @@
+{
+  "parent": "intertnet:private_network",
+  "display": {
+    "icon": {
+      "id": "minecraft:redstone_torch"
+    },
+    "title": "Network Operator",
+    "description": "Wirelessly link two personal cell towers.",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "completed": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

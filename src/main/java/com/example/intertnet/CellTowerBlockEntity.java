@@ -11,6 +11,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
@@ -194,6 +195,9 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
         if (this.level != null) {
             getTrackedTowers(this.level).add(this.worldPosition.immutable());
         }
+        if (this.level instanceof ServerLevel serverLevel && !isSatelliteConnector()) {
+            TowerChunkLoading.remember(serverLevel, this.worldPosition);
+        }
     }
 
     @Override
@@ -286,7 +290,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
 
         boolean isPowered = be.fuelRemaining > 0;
         if (state.getValue(CellTowerBlock.POWERED) != isPowered) {
-            level.setBlock(pos, state.setValue(CellTowerBlock.POWERED, isPowered), Block.UPDATE_ALL);
+            level.setBlock(pos, state.setValue(CellTowerBlock.POWERED, isPowered), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             changed = true;
         }
 
@@ -419,13 +423,13 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
         return Collections.unmodifiableSet(this.wirelessLinks);
     }
 
-    public void toggleWirelessLink(BlockPos targetPos) {
-        if (isSatelliteConnector() || isPublicTower() || targetPos == null || targetPos.equals(this.worldPosition)) return;
+    public boolean toggleWirelessLink(BlockPos targetPos) {
+        if (isSatelliteConnector() || isPublicTower() || targetPos == null || targetPos.equals(this.worldPosition)) return false;
         BlockPos imm = targetPos.immutable();
         if (this.level == null || !this.level.isLoaded(imm)
                 || !(this.level.getBlockEntity(imm) instanceof CellTowerBlockEntity peer)
                 || peer.isPublicTower() || peer.isSatelliteConnector()) {
-            return;
+            return false;
         }
         boolean added;
         if (this.wirelessLinks.contains(imm)) {
@@ -445,6 +449,7 @@ public class CellTowerBlockEntity extends BlockEntity implements Container, Menu
             peer.wirelessLinks.remove(this.worldPosition);
             peer.syncToClients();
         }
+        return added;
     }
 
     public void syncToClients() {

@@ -3,6 +3,7 @@ package com.example.intertnet;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionResult;
@@ -70,6 +71,9 @@ public class CellTowerBlock extends BaseEntityBlock {
     @Override
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {
+            if (level instanceof ServerLevel serverLevel && !(this instanceof SatelliteConnectorBlock)) {
+                TowerChunkLoading.forget(serverLevel, pos);
+            }
             BlockEntity be = level.getBlockEntity(pos);
             if (be instanceof CellTowerBlockEntity tower) {
                 Containers.dropContents(level, pos, tower);

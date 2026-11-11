@@ -621,6 +621,9 @@ final class EmergencyDispatch {
         private void treat(ServerPlayer owner, long now) {
             if (owner.getHealth() >= owner.getMaxHealth()) {
                 finishTreatment(owner, "Treatment complete. The doors are open.");
+                if (phase == Phase.WAITING_FOR_EXIT) {
+                    IntertnetAdvancements.award(owner, IntertnetAdvancements.EMERGENCY_RESPONSE);
+                }
                 return;
             }
             if (now >= sceneDeadline) {
@@ -689,6 +692,7 @@ final class EmergencyDispatch {
 
         private void patrol(ServerPlayer owner, long now) {
             if (kills >= KILL_TARGET) {
+                IntertnetAdvancements.award(owner, IntertnetAdvancements.EMERGENCY_RESPONSE);
                 leave(owner, "Police cleared 10 hostile mobs and are leaving.");
                 return;
             }
@@ -706,6 +710,7 @@ final class EmergencyDispatch {
             if (!threats.isEmpty()) {
                 clearSince = now;
             } else if (now - clearSince >= 20 * 60) {
+                IntertnetAdvancements.award(owner, IntertnetAdvancements.EMERGENCY_RESPONSE);
                 leave(owner, "Area clear. Police are leaving (" + kills + "/10 hostile mobs).");
                 return;
             }

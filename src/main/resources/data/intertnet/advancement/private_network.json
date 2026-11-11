@@ -1,0 +1,19 @@
+{
+  "parent": "intertnet:connected",
+  "display": {
+    "icon": {
+      "id": "intertnet:cell_tower"
+    },
+    "title": "Private Network",
+    "description": "Connect your phone to a player-built cell network.",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "completed": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

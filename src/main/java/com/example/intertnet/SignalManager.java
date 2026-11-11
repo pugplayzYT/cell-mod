@@ -93,11 +93,11 @@ public class SignalManager {
         double rawDist = playerEyePos.distanceTo(towerCenter);
         boolean powered = tower.isPowered();
         int maxRange = powered ? tower.getActiveRange() : tower.getConfiguredRange();
-        boolean simMatches = TowerNetworkManager.doesTowerMatchSim(level, tower, simNetwork);
 
         if (rawDist > maxRange + 32) {
-            return new TowerSignalEval(tPos, tower, 0, rawDist, rawDist, maxRange, 0, List.of(), powered, simMatches);
+            return new TowerSignalEval(tPos, tower, 0, rawDist, rawDist, maxRange, 0, List.of(), powered, false);
         }
+        boolean simMatches = TowerNetworkManager.doesTowerMatchSim(level, tower, simNetwork);
 
         List<BlockPos> occluded = traceOccludingBlocks(level, playerEyePos, towerCenter, tPos);
         int occludingCount = occluded.size();
@@ -139,8 +139,23 @@ public class SignalManager {
         return result;
     }
 
+    static boolean hasCellCoverage(Player player) {
+        Level level = player.level();
+        Vec3 eyePos = player.getEyePosition();
+        for (CellTowerBlockEntity tower : getActiveTowerEntities(level)) {
+            if (!tower.isSatelliteConnector() && evaluateTower(level, eyePos, tower, tower.getNetworkUid()).bars() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static SignalStatus getBestSignal(Player player, @Nullable String simNetwork) {
         Level level = player.level();
+        if (level.isClientSide) {
+            SignalStatus serverSignal = ClientPhoneState.getSignal(player, simNetwork);
+            if (serverSignal != null) return serverSignal;
+        }
         Vec3 eyePos = player.getEyePosition();
         List<CellTowerBlockEntity> towers = getActiveTowerEntities(level);
 

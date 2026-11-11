@@ -115,9 +115,9 @@ public class PhoneScreen extends Screen {
         String sigLabel;
         int sigColor;
         if (bars > 0) {
-            String netId = sig.connectedTowerPos() != null
-                    ? TowerNetworkManager.getNetworkId(player.level(), sig.connectedTowerPos())
-                    : "NET";
+            String netId = ClientPhoneState.getSignal(player, simNet) != null
+                    ? ClientPhoneState.getCurrentNetworkLabel()
+                    : TowerNetworkManager.getNetworkId(player.level(), sig.connectedTowerPos());
             sigLabel = bars + "/4 • " + netId;
             sigColor = switch (bars) {
                 case 4 -> 0xFF34D399;

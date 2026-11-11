@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -167,8 +168,36 @@ public class ModNetwork {
         }
     }
 
+    public record PhoneSignal(ResourceLocation dimension, @Nullable String sim, SignalManager.SignalStatus status) {
+        private static void write(FriendlyByteBuf buf, PhoneSignal signal) {
+            buf.writeResourceLocation(signal.dimension());
+            buf.writeNullable(signal.sim(), FriendlyByteBuf::writeUtf);
+            var status = signal.status();
+            buf.writeVarInt(status.bars());
+            buf.writeNullable(status.connectedTowerPos(), (output, pos) -> output.writeBlockPos(pos));
+            buf.writeDouble(status.rawDistance());
+            buf.writeDouble(status.effectiveDistance());
+            buf.writeVarInt(status.maxRange());
+            buf.writeVarInt(status.occludingBlocks());
+            buf.writeBoolean(status.missingOrWrongSim());
+            buf.writeBoolean(status.unpoweredTowerNearby());
+            buf.writeBoolean(status.satelliteSkyBlockedNearby());
+            buf.writeBoolean(status.connectedViaSatellite());
+        }
+
+        private static PhoneSignal read(FriendlyByteBuf buf) {
+            ResourceLocation dimension = buf.readResourceLocation();
+            String sim = buf.readNullable(FriendlyByteBuf::readUtf);
+            var status = new SignalManager.SignalStatus(buf.readVarInt(), buf.readNullable(input -> input.readBlockPos()),
+                    buf.readDouble(), buf.readDouble(), buf.readVarInt(), buf.readVarInt(),
+                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
+            return new PhoneSignal(dimension, sim, status);
+        }
+    }
+
     public record SyncPhoneDataPayload(
             String networkLabel,
+            @Nullable PhoneSignal signal,
             List<OrderSnapshot> orders,
             List<MessageSnapshot> messages,
             List<String> peers
@@ -177,6 +206,7 @@ public class ModNetwork {
         public static final StreamCodec<FriendlyByteBuf, SyncPhoneDataPayload> STREAM_CODEC = StreamCodec.of(
                 (buf, val) -> {
                     buf.writeUtf(val.networkLabel());
+                    buf.writeNullable(val.signal(), PhoneSignal::write);
                     buf.writeVarInt(val.orders().size());
                     for (OrderSnapshot o : val.orders()) {
                         buf.writeUtf(o.orderId());
@@ -199,6 +229,7 @@ public class ModNetwork {
                 },
                 buf -> {
                     String netLabel = buf.readUtf();
+                    PhoneSignal signal = buf.readNullable(PhoneSignal::read);
                     int oCount = buf.readVarInt();
                     List<OrderSnapshot> orders = new ArrayList<>(oCount);
                     for (int i = 0; i < oCount; i++) {
@@ -225,7 +256,7 @@ public class ModNetwork {
                     for (int i = 0; i < pCount; i++) {
                         peers.add(buf.readUtf());
                     }
-                    return new SyncPhoneDataPayload(netLabel, orders, msgs, peers);
+                    return new SyncPhoneDataPayload(netLabel, signal, orders, msgs, peers);
                 }
         );
 
@@ -236,7 +267,7 @@ public class ModNetwork {
     }
 
     public static void registerPayloads(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("8");
+        final PayloadRegistrar registrar = event.registrar("9");
         registrar.playToServer(ServiceRequestPayload.TYPE, ServiceRequestPayload.STREAM_CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
@@ -419,7 +450,9 @@ public class ModNetwork {
             }
             BlockEntity be = player.level().getBlockEntity(payload.towerPos());
             if (be instanceof CellTowerBlockEntity tower) {
-                tower.toggleWirelessLink(payload.targetPos());
+                if (tower.toggleWirelessLink(payload.targetPos())) {
+                    IntertnetAdvancements.award(player, IntertnetAdvancements.NETWORK_OPERATOR);
+                }
                 player.level().playSound(null, payload.towerPos(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.BLOCKS, 0.7f, 1.3f);
             }
         });
@@ -441,7 +474,7 @@ public class ModNetwork {
 
     private static void handleSyncPhoneData(final SyncPhoneDataPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
-            ClientPhoneState.update(payload.networkLabel(), payload.orders(), payload.messages(), payload.peers());
+            ClientPhoneState.update(payload.networkLabel(), payload.signal(), payload.orders(), payload.messages(), payload.peers());
         });
     }
 }

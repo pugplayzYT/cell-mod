@@ -148,6 +148,7 @@ public class IntertnetMod {
         NeoForge.EVENT_BUS.addListener(this::onPlayerClone);
         NeoForge.EVENT_BUS.addListener(this::onServerAboutToStart);
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(TowerChunkLoading::tick);
         NeoForge.EVENT_BUS.addListener(DeliveryManager::onServerTick);
         TownServices.register();
         TowerGuards.register();
@@ -240,6 +241,8 @@ public class IntertnetMod {
             NeoForge.EVENT_BUS.addListener(CellTowerDebugRenderer::onRenderLevelStage);
             NeoForge.EVENT_BUS.addListener(CellTowerDebugRenderer::onDebugText);
             NeoForge.EVENT_BUS.addListener(PhoneHudOverlay::onRenderGui);
+            NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) ->
+                    ClientPhoneState.reset());
         }
 
         private static void onRegisterMenuScreens(final RegisterMenuScreensEvent event) {

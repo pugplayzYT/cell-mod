@@ -480,6 +480,13 @@ final class TownServices {
             ServiceTrip.Result result = player.serverLevel() != job.level || !player.isAlive()
                     || job.level.getGameTime() > job.deadline ? ServiceTrip.Result.FAILED : tickJob(job, player);
             if (result != ServiceTrip.Result.ACTIVE) {
+                if (result == ServiceTrip.Result.COMPLETED) {
+                    switch (job.mode) {
+                        case DELIVERY -> IntertnetAdvancements.award(player, IntertnetAdvancements.DINNER_DELIVERED);
+                        case RIDESHARE -> IntertnetAdvancements.award(player, IntertnetAdvancements.GOING_PLACES);
+                        case DINING -> { }
+                    }
+                }
                 closeJob(job);
                 iter.remove();
                 settle(player, entry.getKey().slot, result != ServiceTrip.Result.FAILED);

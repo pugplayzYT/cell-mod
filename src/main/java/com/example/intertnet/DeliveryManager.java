@@ -19,6 +19,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class DeliveryManager {
@@ -35,8 +36,16 @@ public class DeliveryManager {
     public static void onServerTick(final ServerTickEvent.Post event) {
         if (++syncTickCounter >= 10) {
             syncTickCounter = 0;
-            for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-                syncToPlayer(player);
+            var players = event.getServer().getPlayerList().getPlayers();
+            var signals = new HashMap<ServerPlayer, ModNetwork.PhoneSignal>();
+            List<String> peers = new ArrayList<>();
+            for (ServerPlayer player : players) {
+                ModNetwork.PhoneSignal signal = phoneSignal(player);
+                signals.put(player, signal);
+                if (isConnected(signal)) peers.add(peerLabel(player, signal));
+            }
+            for (ServerPlayer player : players) {
+                syncToPlayer(player, signals.get(player), peers);
             }
         }
     }
@@ -76,13 +85,15 @@ public class DeliveryManager {
                 new ChatMessage(sender.getScoreboardName(), senderSimNet, cleanText, System.currentTimeMillis())
         );
 
-        // Deliver globally to every player who has signal on ANY cellular carrier!
+        boolean delivered = false;
+        // Deliver globally to every player who has signal on any cellular carrier.
         for (ServerPlayer peer : sender.server.getPlayerList().getPlayers()) {
             String peerSim = findPlayerSimNetwork(peer);
             if (peerSim == null) continue;
             SignalManager.SignalStatus peerSig = SignalManager.getBestSignal(peer, peerSim);
             if (peerSig.bars() > 0 && peerSig.connectedTowerPos() != null) {
                 if (peer != sender) {
+                    delivered = true;
                     peer.displayClientMessage(Component.literal("💬 [" + sender.getScoreboardName() + "]: " + cleanText)
                             .withStyle(ChatFormatting.AQUA), true);
                     peer.level().playSound(null, peer.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6f, 1.6f);
@@ -90,6 +101,7 @@ public class DeliveryManager {
                 syncToPlayer(peer);
             }
         }
+        if (delivered) IntertnetAdvancements.award(sender, IntertnetAdvancements.MESSAGE_SENT);
         syncToPlayer(sender);
     }
 
@@ -123,35 +135,54 @@ public class DeliveryManager {
     }
 
     public static void syncToPlayer(ServerPlayer player) {
+        ModNetwork.PhoneSignal signal = phoneSignal(player);
+        List<String> peers = new ArrayList<>();
+        if (isConnected(signal)) {
+            for (ServerPlayer peer : player.server.getPlayerList().getPlayers()) {
+                ModNetwork.PhoneSignal peerSignal = peer == player ? signal : phoneSignal(peer);
+                if (isConnected(peerSignal)) peers.add(peerLabel(peer, peerSignal));
+            }
+        }
+        syncToPlayer(player, signal, peers);
+    }
+
+    @Nullable
+    private static ModNetwork.PhoneSignal phoneSignal(ServerPlayer player) {
         String simNet = findPlayerSimNetwork(player);
+        return simNet == null ? null : new ModNetwork.PhoneSignal(player.level().dimension().location(), simNet,
+                SignalManager.getBestSignal(player, simNet));
+    }
+
+    private static boolean isConnected(@Nullable ModNetwork.PhoneSignal signal) {
+        return signal != null && signal.status().bars() > 0 && signal.status().connectedTowerPos() != null;
+    }
+
+    private static String peerLabel(ServerPlayer player, ModNetwork.PhoneSignal signal) {
+        return player.getScoreboardName() + " [" + signal.sim() + "]";
+    }
+
+    private static void syncToPlayer(ServerPlayer player, @Nullable ModNetwork.PhoneSignal signal, List<String> peers) {
         List<ModNetwork.OrderSnapshot> orders = new ArrayList<>();
         TownServices.addTracking(player, orders);
         EmergencyDispatch.addTracking(player, orders);
 
         List<ModNetwork.MessageSnapshot> messages = new ArrayList<>();
-        List<String> peersOnNetwork = new ArrayList<>();
+        List<String> peersOnNetwork = List.of();
         String currentNetLabel = "Offline";
 
-        if (simNet != null) {
-            SignalManager.SignalStatus sig = SignalManager.getBestSignal(player, simNet);
-            if (sig.bars() > 0 && sig.connectedTowerPos() != null) {
-                currentNetLabel = TowerNetworkManager.getNetworkId(player.level(), sig.connectedTowerPos());
-                for (ChatMessage m : MessageSavedData.get(player.server.overworld()).getMessagesSnapshot()) {
-                    messages.add(new ModNetwork.MessageSnapshot(m.senderName(), m.senderSimNet(), m.text()));
-                }
-                for (ServerPlayer p : player.server.getPlayerList().getPlayers()) {
-                    String pSim = findPlayerSimNetwork(p);
-                    if (pSim == null) continue;
-                    SignalManager.SignalStatus ps = SignalManager.getBestSignal(p, pSim);
-                    if (ps.bars() > 0 && ps.connectedTowerPos() != null) {
-                        peersOnNetwork.add(p.getScoreboardName() + " [" + pSim + "]");
-                    }
-                }
+        if (isConnected(signal)) {
+            var status = signal.status();
+            currentNetLabel = TowerNetworkManager.getNetworkId(player.level(), status.connectedTowerPos());
+            IntertnetAdvancements.checkConnection(player, status);
+            peersOnNetwork = peers;
+            for (ChatMessage m : MessageSavedData.get(player.server.overworld()).getMessagesSnapshot()) {
+                messages.add(new ModNetwork.MessageSnapshot(m.senderName(), m.senderSimNet(), m.text()));
             }
         }
 
         PacketDistributor.sendToPlayer(player, new ModNetwork.SyncPhoneDataPayload(
                 currentNetLabel,
+                signal,
                 orders,
                 messages,
                 peersOnNetwork
