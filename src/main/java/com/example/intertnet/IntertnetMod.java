@@ -102,7 +102,8 @@ public class IntertnetMod {
     public static final DeferredItem<BlockItem> SATELLITE_CONNECTOR_ITEM = ITEMS.registerSimpleBlockItem("satellite_connector", SATELLITE_CONNECTOR_BLOCK);
     static final DeferredBlock<Block> SATELLITE_RELAY = BLOCKS.register("satellite_relay",
             () -> new GlobalSatelliteNetwork.RelayBlock(BlockBehaviour.Properties.of()
-                    .mapColor(MapColor.METAL).strength(3.5f, 6.0f).sound(SoundType.METAL).lightLevel(state -> 9)));
+                    .mapColor(MapColor.METAL).strength(3.5f, 6.0f).sound(SoundType.METAL).noOcclusion()
+                    .lightLevel(state -> 9)));
     static final DeferredItem<Item> PERSONAL_SATELLITE_ANTENNA = ITEMS.register("personal_satellite_antenna",
             PersonalSatelliteAntennaItem::new);
 

@@ -6,12 +6,16 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.jetbrains.annotations.Nullable;
 
@@ -180,8 +184,19 @@ final class GlobalSatelliteNetwork extends SavedData {
     }
 
     static final class RelayBlock extends Block {
+        private static final VoxelShape SHAPE = Shapes.or(
+                Block.box(3, 3, 3, 13, 13, 13),
+                Block.box(0, 7, 5, 16, 9, 11),
+                Block.box(3, 4, 0, 13, 14, 3),
+                Block.box(7, 12, 8, 9, 16, 10));
+
         RelayBlock(Properties properties) {
             super(properties);
+        }
+
+        @Override
+        protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+            return SHAPE;
         }
 
         @Override

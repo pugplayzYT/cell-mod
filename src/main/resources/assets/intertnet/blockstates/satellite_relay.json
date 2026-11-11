@@ -1,7 +1,7 @@
 {
   "variants": {
     "": {
-      "model": "intertnet:block/cell_tower"
+      "model": "intertnet:block/satellite_relay"
     }
   }
 }
