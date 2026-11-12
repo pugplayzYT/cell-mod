@@ -157,7 +157,8 @@ public class ModNetwork {
                 ByteBufCodecs.VAR_INT, ServiceQuotesPayload::mode,
                 ByteBufCodecs.VAR_INT, ServiceQuotesPayload::reference,
                 ByteBufCodecs.STRING_UTF8, ServiceQuotesPayload::message,
-                CHOICE_CODEC.apply(ByteBufCodecs.list(3)), ServiceQuotesPayload::choices,
+                CHOICE_CODEC.apply(ByteBufCodecs.list(Math.max(TownServices.RIDESHARE_DESTINATION_COUNT, Meal.values().length))),
+                ServiceQuotesPayload::choices,
                 ServiceQuotesPayload::new
         );
 
@@ -400,7 +401,7 @@ public class ModNetwork {
         });
         registrar.playToClient(ServiceMenuPayload.TYPE, ServiceMenuPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientHooks.openRestaurantScreen(payload.chefId())));
-        registrar.playToClient(ServiceQuotesPayload.TYPE, ServiceQuotesPayload.STREAM_CODEC,
+        registrar.versioned("13").playToClient(ServiceQuotesPayload.TYPE, ServiceQuotesPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientHooks.receiveServiceQuotes(payload)));
         registrar.playToClient(ServiceFeedbackPayload.TYPE, ServiceFeedbackPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientHooks.receiveServiceFeedback(payload)));

@@ -57,6 +57,7 @@ final class TownServices {
     static final ResourceKey<Structure> MANSION =
             ResourceKey.create(Registries.STRUCTURE, net.minecraft.resources.ResourceLocation.withDefaultNamespace("mansion"));
     static final String MANSION_LABEL = "Woodland Mansion";
+    static final int RIDESHARE_DESTINATION_COUNT = 4;
     private static final Map<JobKey, Job> jobs = new HashMap<>();
     private static final Map<UUID, EnumMap<Mode, Quotes>> quoteCache = new HashMap<>();
     private static int nextQuoteId;

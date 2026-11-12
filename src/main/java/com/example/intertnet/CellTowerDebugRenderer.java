@@ -109,7 +109,7 @@ public class CellTowerDebugRenderer {
         List<CellTowerBlockEntity> towers = SignalManager.getActiveTowerEntities(player.level());
 
         event.getLeft().add("");
-        event.getLeft().add("§b[Intertnet Cellular F3 Telemetry]§r");
+        event.getLeft().add("§b[Internet Cellular F3 Telemetry]§r");
         event.getLeft().add("Active Cell Towers in Level: §a" + towers.size() + "§r | Inserted SIM: §e" + (simNet != null ? simNet : "NONE") + "§r");
         if (sig.bars() > 0 && sig.connectedTowerPos() != null) {
             event.getLeft().add(String.format(Locale.ROOT,

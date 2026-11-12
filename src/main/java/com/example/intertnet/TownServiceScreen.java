@@ -44,10 +44,11 @@ final class TownServiceScreen extends Screen {
     protected void init() {
         panelWidth = Math.min(width - 12, MAX_PANEL_WIDTH);
         panelX = (width - panelWidth) / 2;
-        extraRow = mode == TownServices.Mode.RIDESHARE ? 22 : 0;
+        int buttonCount = mode == TownServices.Mode.RIDESHARE ? TownServices.RIDESHARE_DESTINATION_COUNT : Meal.values().length;
+        extraRow = (buttonCount - 3) * 22;
         panelY = (height - PANEL_HEIGHT - extraRow) / 2;
         orderButtons.clear();
-        for (int i = 0; i < 3 + extraRow / 22; i++) {
+        for (int i = 0; i < buttonCount; i++) {
             int index = i;
             orderButtons.add(addRenderableWidget(Button.builder(Component.empty(), button -> placeOrder(index))
                     .bounds(panelX + 10, panelY + 42 + i * 22, panelWidth - 20, 20).build()));

@@ -18,7 +18,7 @@ public class GuidebookHelper {
         // Vanilla written books fit max 14 lines (~114px wide) per page.
         // Every page below is carefully kept under 11 wrapped lines so nothing ever cuts off!
         List<Filterable<Component>> pages = List.of(
-                page(Component.literal("INTERTNET MANUAL\n")
+                page(Component.literal("INTERNET MANUAL\n")
                         .withStyle(ChatFormatting.DARK_BLUE, ChatFormatting.BOLD)
                         .append(Component.literal("By The Internet Maker\n\n").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC))
                         .append(Component.literal("Normal server chat is disabled!\n\nFlip pages below to learn about Phones, SIMs, Towers & Satellites.")
@@ -30,7 +30,7 @@ public class GuidebookHelper {
 
                 page(Component.literal("2. Using Your Phone\n")
                         .withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)
-                        .append(Component.literal("\nRight-click while holding a Phone to open Intertnet OS.\n\nWhen a Phone is anywhere in your inventory, live Signal Bars appear in the top-right corner!").withStyle(ChatFormatting.BLACK))),
+                        .append(Component.literal("\nRight-click while holding a Phone to open Internet OS.\n\nWhen a Phone is anywhere in your inventory, live Signal Bars appear in the top-right corner!").withStyle(ChatFormatting.BLACK))),
 
                 page(Component.literal("3. Cell Towers\n")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
@@ -100,7 +100,7 @@ public class GuidebookHelper {
         );
 
         WrittenBookContent content = new WrittenBookContent(
-                Filterable.passThrough("Intertnet Manual"),
+                Filterable.passThrough("Internet Manual"),
                 "The Internet Maker",
                 0,
                 pages,

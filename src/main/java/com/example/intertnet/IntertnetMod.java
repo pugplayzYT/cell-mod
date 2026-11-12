@@ -217,7 +217,7 @@ public class IntertnetMod {
                             if (!player.getInventory().add(guide)) {
                                 player.drop(guide, false);
                             }
-                            player.sendSystemMessage(Component.literal("📘 Added the Intertnet Manual (signed by The Internet Maker) to your inventory!").withStyle(ChatFormatting.AQUA));
+                            player.sendSystemMessage(Component.literal("📘 Added the Internet Manual (signed by The Internet Maker) to your inventory!").withStyle(ChatFormatting.AQUA));
                             return 1;
                         })
         );
@@ -235,7 +235,7 @@ public class IntertnetMod {
             if (!player.getInventory().add(guide)) {
                 player.drop(guide, false);
             }
-            player.sendSystemMessage(Component.literal("📘 Welcome! You received the Intertnet Manual signed by The Internet Maker (use /guide anytime for another copy).")
+            player.sendSystemMessage(Component.literal("📘 Welcome! You received the Internet Manual signed by The Internet Maker (use /guide anytime for another copy).")
                     .withStyle(ChatFormatting.AQUA));
         }
         DeliveryManager.syncToPlayer(player);

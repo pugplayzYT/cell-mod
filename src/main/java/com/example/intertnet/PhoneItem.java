@@ -60,6 +60,6 @@ public class PhoneItem extends Item {
         if (hasSatelliteAntenna(stack)) {
             tooltipComponents.add(Component.literal("Global Satellite antenna installed").withStyle(ChatFormatting.AQUA));
         }
-        tooltipComponents.add(Component.literal("Right-click to open Intertnet OS").withStyle(ChatFormatting.AQUA));
+        tooltipComponents.add(Component.literal("Right-click to open Internet OS").withStyle(ChatFormatting.AQUA));
     }
 }

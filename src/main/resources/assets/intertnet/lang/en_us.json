@@ -1,5 +1,5 @@
 {
-  "itemGroup.intertnet": "Intertnet Cellular",
+  "itemGroup.intertnet": "Internet Cellular",
   "item.intertnet.phone": "Cellular Phone",
   "item.intertnet.sim_card": "SIM Card",
   "item.intertnet.low_antenna": "Low Tier Antenna",
@@ -16,5 +16,5 @@
   "block.intertnet.satellite_connector": "Portable Satellite Connector",
   "gui.intertnet.cell_tower.title": "Cell Tower Infrastructure",
   "gui.intertnet.satellite_connector.title": "Portable Satellite Connector",
-  "gui.intertnet.phone.title": "Intertnet OS"
+  "gui.intertnet.phone.title": "Internet OS"
 }
