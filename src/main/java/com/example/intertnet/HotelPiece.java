@@ -36,8 +36,9 @@ final class HotelPiece extends StructurePiece {
     static final int DEPTH = 6;
     static final int ENTRY = -1;
     static final int EXIT = -2;
-    private static final int CURRENT_LAYOUT = 4;
+    private static final int CURRENT_LAYOUT = 5;
     private static final int PORCH_MIN_X = 4;
+    private static final int PLAINS_PORCH_MAX_X = 11;
     private static final int WILD_PORCH_MAX_X = 12;
     private static final BlockPos WILD_CHECKOUT = new BlockPos(6, 0, 6);
     static final BlockPos WIFI = new BlockPos(7, 1, 2);
@@ -137,7 +138,7 @@ final class HotelPiece extends StructurePiece {
             buildWildStaircase(level, box);
             lightCheckout(level, box);
         }
-        int porchMaxX = wild ? WILD_PORCH_MAX_X : 11;
+        int porchMaxX = wild ? WILD_PORCH_MAX_X : PLAINS_PORCH_MAX_X;
         for (int x = PORCH_MIN_X; x <= porchMaxX; x++) {
             for (int z = 13; z <= 15; z++) {
                 fillColumnDown(level, Blocks.COBBLESTONE.defaultBlockState(), x, surface - 1, z, box);
@@ -149,7 +150,8 @@ final class HotelPiece extends StructurePiece {
             fill(level, box, 6, surface + 1, 13, 10, surface + 3, 13, Blocks.DARK_OAK_PLANKS);
             fill(level, box, 6, surface + 4, 13, 10, surface + 4, 13, Blocks.DARK_OAK_SLAB);
         } else {
-            fill(level, box, 4, surface + 4, 11, 11, surface + 4, 14, Blocks.DARK_OAK_SLAB);
+            // The solid roof layer already covers the porch through z = 13.
+            fill(level, box, PORCH_MIN_X, surface + 4, 14, porchMaxX, surface + 4, 14, Blocks.DARK_OAK_SLAB);
             fill(level, box, 4, surface + 1, 13, 4, surface + 3, 14, Blocks.DARK_OAK_LOG);
             fill(level, box, 11, surface + 1, 13, 11, surface + 3, 14, Blocks.DARK_OAK_LOG);
             fill(level, box, 4, surface + 1, 13, 11, surface + 3, 13, wall);
@@ -232,9 +234,22 @@ final class HotelPiece extends StructurePiece {
                 }
             }
         }
-        if (wild) balanceWildPorch(level, box);
+        if (wild && layoutVersion < 4) balanceWildPorch(level, box);
+        if (!wild) repairPlainsRoof(level, box);
         layoutVersion = CURRENT_LAYOUT;
         return true;
+    }
+
+    private void repairPlainsRoof(ServerLevel level, BoundingBox box) {
+        BlockState slab = Blocks.DARK_OAK_SLAB.defaultBlockState();
+        for (int x = PORCH_MIN_X; x <= PLAINS_PORCH_MAX_X; x++) {
+            for (int z = 11; z <= 13; z++) {
+                BlockPos pos = getWorldPos(x, 4, z);
+                if (level.getBlockState(pos) == slab && level.getBlockState(pos.above()) == slab) {
+                    put(level, box, x, 4, z, Blocks.DARK_OAK_PLANKS);
+                }
+            }
+        }
     }
 
     private void balanceWildPorch(ServerLevel level, BoundingBox box) {
