@@ -6,8 +6,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
@@ -38,13 +36,14 @@ final class HotelPiece extends StructurePiece {
     static final int DEPTH = 6;
     static final int ENTRY = -1;
     static final int EXIT = -2;
-    private static final int CURRENT_LAYOUT = 3;
+    private static final int CURRENT_LAYOUT = 4;
+    private static final int PORCH_MIN_X = 4;
+    private static final int WILD_PORCH_MAX_X = 12;
     private static final BlockPos WILD_CHECKOUT = new BlockPos(6, 0, 6);
     static final BlockPos WIFI = new BlockPos(7, 1, 2);
     static final List<BlockPos> ROOM_DOORS = List.of(new BlockPos(5, 1, 4), new BlockPos(10, 1, 4),
             new BlockPos(5, 1, 9), new BlockPos(10, 1, 9));
     private final boolean wild;
-    private boolean staffed;
     private int layoutVersion;
 
     HotelPiece(int x, int y, int z, boolean wild) {
@@ -57,7 +56,6 @@ final class HotelPiece extends StructurePiece {
     HotelPiece(CompoundTag tag) {
         super(IntertnetMod.HOTEL_PIECE.get(), tag);
         wild = tag.getBoolean("Wild");
-        staffed = tag.getBoolean("Staffed");
         layoutVersion = tag.contains("LayoutVersion") ? tag.getInt("LayoutVersion")
                 : tag.getBoolean("RepairedLayout") ? 1 : 0;
     }
@@ -70,6 +68,10 @@ final class HotelPiece extends StructurePiece {
         return new BlockPos(8, wild ? DEPTH + 1 : 1, 13);
     }
 
+    static BlockPos reception(boolean wild) {
+        return new BlockPos(5, entrance(wild).getY(), 14);
+    }
+
     static BlockPos reader(boolean wild, int role) {
         if (role == ENTRY) return entrance(wild).east();
         if (role == EXIT) return wild ? WILD_CHECKOUT : new BlockPos(7, 1, 12);
@@ -79,7 +81,6 @@ final class HotelPiece extends StructurePiece {
     @Override
     protected void addAdditionalSaveData(StructurePieceSerializationContext context, CompoundTag tag) {
         tag.putBoolean("Wild", wild);
-        tag.putBoolean("Staffed", staffed);
         tag.putInt("LayoutVersion", layoutVersion);
     }
 
@@ -136,13 +137,14 @@ final class HotelPiece extends StructurePiece {
             buildWildStaircase(level, box);
             lightCheckout(level, box);
         }
-        for (int x = 4; x <= 11; x++) {
+        int porchMaxX = wild ? WILD_PORCH_MAX_X : 11;
+        for (int x = PORCH_MIN_X; x <= porchMaxX; x++) {
             for (int z = 13; z <= 15; z++) {
                 fillColumnDown(level, Blocks.COBBLESTONE.defaultBlockState(), x, surface - 1, z, box);
             }
         }
-        fill(level, box, 4, surface, 13, 11, surface, 15, floor);
-        generateAirBox(level, box, 4, surface + 1, 13, 11, surface + 3, 15);
+        fill(level, box, PORCH_MIN_X, surface, 13, porchMaxX, surface, 15, floor);
+        generateAirBox(level, box, PORCH_MIN_X, surface + 1, 13, porchMaxX, surface + 3, 15);
         if (wild) {
             fill(level, box, 6, surface + 1, 13, 10, surface + 3, 13, Blocks.DARK_OAK_PLANKS);
             fill(level, box, 6, surface + 4, 13, 10, surface + 4, 13, Blocks.DARK_OAK_SLAB);
@@ -157,21 +159,8 @@ final class HotelPiece extends StructurePiece {
         reader(level, box, ENTRY, "Insert hotel pass");
         reader(level, box, EXIT, "Checkout");
         entranceSign(level, box, surface);
-        put(level, box, 4, surface + 1, 15, Blocks.LANTERN);
-        put(level, box, 11, surface + 1, 15, Blocks.LANTERN);
-        if (!staffed) {
-            Villager receptionist = EntityType.VILLAGER.create(level.getLevel());
-            if (receptionist != null) {
-                BlockPos position = getWorldPos(5, surface + 1, 14);
-                receptionist.moveTo(position.getX() + 0.5, position.getY(), position.getZ() + 0.5, 0, 0);
-                receptionist.setCustomName(Component.literal("Hotel Receptionist"));
-                receptionist.setPersistenceRequired();
-                receptionist.setNoAi(true);
-                HotelAccess.markReceptionist(receptionist, getWorldPos(0, 0, 0), wild);
-                level.addFreshEntityWithPassengers(receptionist);
-                staffed = true;
-            }
-        }
+        put(level, box, PORCH_MIN_X, surface + 1, 15, Blocks.LANTERN);
+        put(level, box, porchMaxX, surface + 1, 15, Blocks.LANTERN);
         layoutVersion = CURRENT_LAYOUT;
     }
 
@@ -234,15 +223,35 @@ final class HotelPiece extends StructurePiece {
                 moveCheckout(level, box);
             }
         }
-        repairExterior(level, box);
-        for (int x : new int[]{2, 13}) {
-            if (level.getBlockState(getWorldPos(x, 1, 3)).getBlock() instanceof BedBlock
-                    && level.isEmptyBlock(getWorldPos(x, 1, 2))) {
-                put(level, box, x, 1, 2, wild ? Blocks.MOSSY_STONE_BRICKS : Blocks.STRIPPED_OAK_WOOD);
+        if (layoutVersion < 3) {
+            repairExterior(level, box);
+            for (int x : new int[]{2, 13}) {
+                if (level.getBlockState(getWorldPos(x, 1, 3)).getBlock() instanceof BedBlock
+                        && level.isEmptyBlock(getWorldPos(x, 1, 2))) {
+                    put(level, box, x, 1, 2, wild ? Blocks.MOSSY_STONE_BRICKS : Blocks.STRIPPED_OAK_WOOD);
+                }
             }
         }
+        if (wild) balanceWildPorch(level, box);
         layoutVersion = CURRENT_LAYOUT;
         return true;
+    }
+
+    private void balanceWildPorch(ServerLevel level, BoundingBox box) {
+        for (int z = 13; z <= 15; z++) {
+            if (!level.getBlockState(getWorldPos(PORCH_MIN_X, DEPTH, z)).is(Blocks.STONE_BRICKS)) continue;
+            BlockPos edge = getWorldPos(WILD_PORCH_MAX_X, DEPTH, z);
+            if (level.getBlockEntity(edge) != null) continue;
+            fillColumnDown(level, Blocks.COBBLESTONE.defaultBlockState(), WILD_PORCH_MAX_X, DEPTH - 1, z, box);
+            put(level, box, WILD_PORCH_MAX_X, DEPTH, z, Blocks.STONE_BRICKS);
+        }
+        BlockPos oldLantern = getWorldPos(WILD_PORCH_MAX_X - 1, DEPTH + 1, 15);
+        if (level.getBlockState(oldLantern).is(Blocks.LANTERN)
+                && level.isEmptyBlock(oldLantern.east())
+                && level.getBlockState(oldLantern.east().below()).is(Blocks.STONE_BRICKS)) {
+            put(level, box, WILD_PORCH_MAX_X, DEPTH + 1, 15, Blocks.LANTERN);
+            level.removeBlock(oldLantern, false);
+        }
     }
 
     private void repairExterior(ServerLevel level, BoundingBox box) {

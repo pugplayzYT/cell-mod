@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
@@ -66,10 +67,6 @@ final class HotelAccess {
         NeoForge.EVENT_BUS.addListener(HotelAccess::onChunkLoad);
         NeoForge.EVENT_BUS.addListener(HotelAccess::tick);
         NeoForge.EVENT_BUS.addListener(HotelAccess::stop);
-    }
-
-    static void markReceptionist(Villager villager, BlockPos origin, boolean wild) {
-        villager.getPersistentData().put(HOTEL, encodeSite(new Site(origin, wild)));
     }
 
     static void markReader(HopperBlockEntity hopper, BlockPos origin, boolean wild, int role) {
@@ -273,7 +270,7 @@ final class HotelAccess {
     }
 
     private static void onChunkLoad(ChunkEvent.Load event) {
-        if (event.isNewChunk() || !(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
         for (var start : event.getChunk().getAllStarts().values()) {
             if (!start.isValid() || !(start.getStructure() instanceof HotelStructure)) continue;
             for (var piece : start.getPieces()) {
@@ -288,10 +285,17 @@ final class HotelAccess {
     }
 
     private static void tick(ServerTickEvent.Post event) {
-        for (LoadedHotel hotel; (hotel = loadedHotels.poll()) != null;) {
+        for (int remaining = loadedHotels.size(); remaining > 0; remaining--) {
+            LoadedHotel hotel = loadedHotels.poll();
+            if (hotel == null) break;
             var chunk = hotel.level.getChunkSource().getChunkNow(hotel.chunk.x, hotel.chunk.z);
             if (chunk == null) continue;
+            if (!hotel.level.areEntitiesLoaded(hotel.chunk.toLong())) {
+                loadedHotels.add(hotel);
+                continue;
+            }
             if (hotel.piece.repairLayout(hotel.level)) chunk.setUnsaved(true);
+            ensureReceptionist(hotel.level, hotel.site);
             closeIdleDoor(hotel.level, hotel.site.entrance());
             for (BlockPos room : HotelPiece.ROOM_DOORS) closeIdleDoor(hotel.level, hotel.site.origin.offset(room));
         }
@@ -320,6 +324,28 @@ final class HotelAccess {
         if (event.getServer().getTickCount() % 5 == 0) {
             for (ServerLevel level : event.getServer().getAllLevels()) tickReaders(level);
         }
+    }
+
+    private static void ensureReceptionist(ServerLevel level, Site site) {
+        BlockPos readerPos = site.origin.offset(HotelPiece.reader(site.wild, HotelPiece.ENTRY));
+        if (!(level.getBlockEntity(readerPos) instanceof HopperBlockEntity hopper)) return;
+        Reader entry = reader(hopper);
+        if (entry == null || entry.role != HotelPiece.ENTRY || !entry.site.equals(site)) return;
+
+        BlockPos position = site.origin.offset(HotelPiece.reception(site.wild));
+        if (!level.getEntitiesOfClass(Villager.class, new AABB(position).inflate(16),
+                villager -> villager.isAlive() && villager.getPersistentData().contains(HOTEL, Tag.TAG_COMPOUND)
+                        && site.equals(decodeSite(villager.getPersistentData().getCompound(HOTEL)))).isEmpty()) return;
+
+        Villager receptionist = EntityType.VILLAGER.create(level);
+        if (receptionist == null) return;
+        receptionist.moveTo(position.getX() + 0.5, position.getY(), position.getZ() + 0.5, 0, 0);
+        if (level.getBlockCollisions(receptionist, receptionist.getBoundingBox()).iterator().hasNext()) return;
+        receptionist.setCustomName(Component.literal("Hotel Receptionist"));
+        receptionist.setPersistenceRequired();
+        receptionist.setNoAi(true);
+        receptionist.getPersistentData().put(HOTEL, encodeSite(site));
+        level.addFreshEntity(receptionist);
     }
 
     private static void closeIdleDoor(ServerLevel level, BlockPos pos) {
