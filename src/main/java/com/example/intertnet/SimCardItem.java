@@ -23,7 +23,7 @@ public class SimCardItem extends Item {
 
     @Nullable
     public static String getSimNetwork(ItemStack stack) {
-        if (stack.isEmpty()) return null;
+        if (!stack.is(IntertnetMod.SIM_CARD_ITEM.get())) return null;
         String net = stack.get(IntertnetMod.SIM_NETWORK.get());
         return (net != null && !net.isBlank()) ? net : null;
     }
